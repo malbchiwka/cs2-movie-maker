@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+config.json
+output/
+uploads/
+cache/
+tools/
+*.mp4
+*.dem
+!samples/test_bgm.mp3
+.vscode/

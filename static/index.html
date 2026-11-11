@@ -1,0 +1,3804 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CS2 Movie Maker — Glass Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@500;700&family=Noto+Sans+Symbols+2&family=Noto+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+  <!--
+    ================================================================================
+    АССЕТЫ И ФАЙЛОВАЯ СТРУКТУРА (/static/)
+    ================================================================================
+    1. Иконки оружия и модификаторов (Panorama-ресурсы из Source 2 Viewer / VRF):
+       Модификаторы (/static/icons/):
+         - /static/icons/headshot.svg       (Хедшот)
+         - /static/icons/penetrate.svg      (Прострел стены)
+         - /static/icons/smoke.svg          (Прострел через дым)
+         - /static/icons/blind.svg          (Убийство вслепую / под флешкой)
+         - /static/icons/noscope.svg        (Без прицела)
+         - /static/icons/airborne.svg       (В прыжке)
+         - /static/icons/merged.svg         (Склеен в один клип)
+       Оружие (/static/icons/weapons/<weapon>.svg):
+         - /static/icons/weapons/ak47.svg
+         - /static/icons/weapons/m4a1.svg
+         - /static/icons/weapons/m4a1_silencer.svg
+         - /static/icons/weapons/awp.svg
+         - /static/icons/weapons/deagle.svg
+         - /static/icons/weapons/usp_silencer.svg
+         - /static/icons/weapons/glock.svg
+         - /static/icons/weapons/p250.svg
+         - /static/icons/weapons/ssg08.svg
+         - /static/icons/weapons/mp9.svg
+         - /static/icons/weapons/mac10.svg
+         - /static/icons/weapons/famas.svg
+         - /static/icons/weapons/galilar.svg
+         - /static/icons/weapons/knife.svg
+         - /static/icons/weapons/hegrenade.svg
+         - /static/icons/weapons/inferno.svg
+       (Пока файла нет — текстовая плашка, список недостающих выводится в консоль).
+
+    2. Модели агентов (PNG с прозрачным фоном):
+       Папка: /static/agents/
+         - /static/agents/default_ct.png, /static/agents/ct_1.png ... ct_5.png
+         - /static/agents/default_t.png,  /static/agents/t_1.png  ... t_5.png
+
+    3. Карты (из Source 2 Viewer: panorama/images/map_icons):
+       Фоны карт (16:9 JPG): /static/maps/<map>.jpg (de_anubis.jpg, de_mirage.jpg и т.д.)
+       Логотипы карт (SVG):  /static/maps/icons/<map>.svg
+       (Пока файлов нет — градиент по цвету карты, список недостающих карт в консоли).
+    ================================================================================
+  -->
+  <style>
+    :root {
+      --bg-base: #0b0d12;
+      --glass-bg: rgba(255, 255, 255, 0.07);
+      --glass-bg-strong: rgba(18, 22, 31, 0.78);
+      --glass-bg-subtle: rgba(255, 255, 255, 0.04);
+      --glass-hover: rgba(255, 255, 255, 0.11);
+      --glass-border: rgba(255, 255, 255, 0.13);
+      --glass-border-subtle: rgba(255, 255, 255, 0.08);
+      --glass-radius: 15px;
+
+      --text-primary: #f5f7fa;
+      --text-secondary: #c2c8d4;
+      --text-muted: #8b94a5;
+
+      --accent-start: #ffb347;
+      --accent-end: #ff6a3d;
+      --accent-grad: linear-gradient(135deg, #ffb347 0%, #ff6a3d 100%);
+      --accent-glow: rgba(255, 138, 66, 0.35);
+      --accent-subtle: rgba(255, 150, 71, 0.15);
+
+      --ct-color: #5d79ae;
+      --ct-light: #89a7e0;
+      --ct-bg: rgba(93, 121, 174, 0.18);
+      --ct-border: rgba(93, 121, 174, 0.42);
+
+      --t-color: #d4a548;
+      --t-light: #f0c76e;
+      --t-bg: rgba(212, 165, 72, 0.18);
+      --t-border: rgba(212, 165, 72, 0.42);
+
+      --danger: #ef4444;
+      --danger-subtle: rgba(239, 68, 68, 0.16);
+      --success: #22c55e;
+      --success-subtle: rgba(34, 197, 94, 0.16);
+
+      /* Dynamic map ambient colors (adjusted via JS when demo loads) */
+      --ambient-1: rgba(212, 145, 72, 0.22);
+      --ambient-2: rgba(93, 121, 174, 0.18);
+      --ambient-3: rgba(255, 106, 61, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      font-family: 'Barlow', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13.5px;
+      line-height: 1.45;
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Ambient Map-Reactive Blurred Background Blobs */
+    .ambient-canvas {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+      background: #0b0d12;
+    }
+    .ambient-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(110px);
+      transition: background 0.6s ease, transform 0.6s ease;
+      opacity: 0.85;
+    }
+    .ambient-blob.b1 {
+      width: 620px;
+      height: 420px;
+      top: -120px;
+      left: -80px;
+      background: var(--ambient-1);
+    }
+    .ambient-blob.b2 {
+      width: 680px;
+      height: 480px;
+      top: 180px;
+      right: -140px;
+      background: var(--ambient-2);
+    }
+    .ambient-blob.b3 {
+      width: 540px;
+      height: 380px;
+      bottom: -100px;
+      left: 28%;
+      background: var(--ambient-3);
+    }
+
+    .condensed, .nick-text {
+      font-family: 'Barlow Condensed', 'Noto Sans', 'Noto Sans JP', 'Noto Sans Symbols 2', sans-serif;
+      letter-spacing: 0.02em;
+    }
+
+    .nick-text {
+      font-size: 15px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+      display: inline-block;
+      vertical-align: bottom;
+    }
+
+    .mono {
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(11, 13, 18, 0.5);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.18);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Main Workspace */
+    .workspace {
+      position: relative;
+      z-index: 1;
+      max-width: 1640px;
+      min-width: 1200px;
+      margin: 0 auto;
+      padding: 14px 20px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    @media (max-width: 1260px) {
+      .workspace {
+        min-width: 100%;
+        padding: 12px 14px 28px;
+      }
+    }
+
+    /* Glass Panel Base */
+    .glass-panel, .card, .demo-bar {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: var(--glass-radius);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+      transition: border-color 0.18s ease, background-color 0.18s ease;
+    }
+
+    .demo-bar {
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      position: relative;
+      z-index: 40;
+    }
+    .demo-bar.dragover {
+      border-color: var(--accent-start);
+      background: rgba(255, 179, 71, 0.12);
+    }
+
+    /* Popover for URL/path input in Top Bar */
+    .path-popover-wrap {
+      position: relative;
+    }
+    .path-popover {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      width: 460px;
+      background: rgba(15, 18, 26, 0.96);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(16px);
+      border-radius: 12px;
+      padding: 10px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.68);
+      display: none;
+      align-items: center;
+      gap: 8px;
+      z-index: 80;
+    }
+    .path-popover.open {
+      display: flex;
+    }
+
+    .card-header {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--glass-border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .section-kicker {
+      font-family: 'Barlow Condensed', 'Noto Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title {
+      font-family: 'Barlow Condensed', 'Noto Sans', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-family: 'Barlow', sans-serif;
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 7px 13px;
+      border-radius: 10px;
+      border: 1px solid var(--glass-border);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .btn:hover:not(:disabled) {
+      background: var(--glass-hover);
+      border-color: rgba(255, 255, 255, 0.26);
+    }
+    .btn:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+    .btn:disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+      filter: grayscale(0.35);
+    }
+
+    .btn-primary {
+      background: var(--accent-grad);
+      border-color: rgba(255, 195, 110, 0.55);
+      color: #111318;
+      font-weight: 700;
+      box-shadow: 0 4px 18px rgba(255, 106, 61, 0.28);
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: linear-gradient(135deg, #ffbe5e 0%, #ff794f 100%);
+      border-color: #ffd089;
+      box-shadow: 0 6px 22px rgba(255, 106, 61, 0.42);
+    }
+
+    .btn-cta-pill {
+      border-radius: 999px;
+      font-family: 'Barlow Condensed', 'Noto Sans', sans-serif;
+      font-size: 16.5px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 12px 18px;
+    }
+
+    .btn-danger {
+      background: var(--danger-subtle);
+      border-color: rgba(239, 68, 68, 0.45);
+      color: #fca5a5;
+    }
+    .btn-danger:hover:not(:disabled) {
+      background: rgba(239, 68, 68, 0.26);
+    }
+
+    .btn-xs {
+      padding: 5px 10px;
+      font-size: 12px;
+      border-radius: 8px;
+    }
+
+    /* Inputs & Selects */
+    .input, .select {
+      background: rgba(11, 13, 18, 0.65);
+      border: 1px solid var(--glass-border);
+      color: var(--text-primary);
+      border-radius: 9px;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 12.5px;
+      outline: none;
+      transition: border-color 0.16s ease, box-shadow 0.16s ease;
+    }
+    .input:focus, .select:focus {
+      border-color: var(--accent-start);
+      box-shadow: 0 0 0 2px rgba(255, 179, 71, 0.2);
+    }
+    .select option, .select optgroup {
+      background: #141821;
+      color: var(--text-primary);
+    }
+    /* Hide native browser up/down number spin buttons */
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type="number"] {
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+
+    .input-num {
+      width: 44px;
+      text-align: center;
+      padding: 3px 4px;
+      font-size: 12.5px;
+      border-radius: 7px;
+    }
+
+    /* Stepper Control for Pre/Post Seconds */
+    .stepper {
+      display: inline-flex;
+      align-items: center;
+      background: rgba(11, 13, 18, 0.75);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      overflow: hidden;
+      vertical-align: middle;
+      transition: border-color 0.16s ease, box-shadow 0.16s ease;
+    }
+    .stepper:focus-within {
+      border-color: rgba(255, 179, 71, 0.65);
+      box-shadow: 0 0 0 2px rgba(255, 179, 71, 0.2);
+    }
+    .stepper-btn {
+      width: 24px;
+      height: 26px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-family: 'Barlow Condensed', -apple-system, sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      transition: background 0.14s ease, color 0.14s ease, transform 0.08s ease;
+    }
+    .stepper-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--accent-start);
+    }
+    .stepper-btn:active {
+      transform: scale(0.9);
+      background: rgba(255, 179, 71, 0.2);
+    }
+    .stepper .input-num {
+      border: none;
+      background: transparent;
+      width: 38px;
+      height: 26px;
+      font-size: 13.5px;
+      padding: 0 2px;
+      border-radius: 0;
+      box-shadow: none;
+      text-align: center;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .stepper .input-num:focus {
+      outline: none;
+      box-shadow: none;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-family: 'Barlow Condensed', 'Noto Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      line-height: 1.25;
+      border: 1px solid transparent;
+      flex-shrink: 0;
+    }
+    .badge-ct {
+      background: var(--ct-bg);
+      color: #a9c3f5;
+      border-color: var(--ct-border);
+    }
+    .badge-t {
+      background: var(--t-bg);
+      color: #f5d284;
+      border-color: var(--t-border);
+    }
+    .badge-neutral {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-secondary);
+      border-color: var(--glass-border);
+    }
+    .badge-accent {
+      background: var(--accent-subtle);
+      color: #ffc270;
+      border-color: rgba(255, 179, 71, 0.45);
+    }
+
+    /* 1 & 2. RECENT DEMOS RIBBON (No glass panel, pure 190x107 cards directly on page background) */
+    .recent-demos-strip {
+      position: relative;
+      z-index: 25;
+      width: 100%;
+      min-height: 112px;
+      padding: 0;
+      margin: 0;
+      clear: both;
+    }
+    .recent-demos-track {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 2px 2px 6px;
+    }
+    .recent-demos-empty {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px dashed var(--glass-border);
+      background: rgba(11, 13, 18, 0.32);
+      color: var(--text-muted);
+      font-size: 13px;
+      text-align: center;
+    }
+    .recent-demo-card-wrap {
+      position: relative;
+      flex: 0 0 190px;
+      width: 190px;
+      height: 107px;
+    }
+    .recent-demo-card {
+      position: relative;
+      width: 190px;
+      height: 107px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 2px solid rgba(255, 255, 255, 0.14);
+      cursor: pointer;
+      display: block;
+      padding: 0;
+      background-size: cover;
+      background-position: center;
+      transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+    }
+    .recent-demo-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .recent-demo-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(11, 13, 18, 0.12) 0%, rgba(11, 13, 18, 0.55) 100%);
+      z-index: 1;
+      pointer-events: none;
+    }
+    .recent-demo-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 179, 71, 0.65);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    }
+    .recent-demo-card.active-demo {
+      border-color: var(--accent-start);
+      box-shadow: 0 0 0 1px var(--accent-start), 0 8px 24px rgba(255, 138, 66, 0.32);
+    }
+    /* Colored win/loss bar at TOP of card */
+    .recent-demo-result-bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 3.5px;
+      z-index: 3;
+    }
+    .recent-demo-result-bar.win {
+      background: var(--success);
+      box-shadow: 0 0 8px rgba(34, 197, 94, 0.7);
+    }
+    .recent-demo-result-bar.loss {
+      background: var(--danger);
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.7);
+    }
+    /* Small map icon bottom-left */
+    .recent-demo-map-icon {
+      position: absolute;
+      left: 8px;
+      bottom: 7px;
+      width: 28px;
+      height: 28px;
+      z-index: 3;
+      object-fit: contain;
+      filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.9));
+      pointer-events: none;
+    }
+    /* Small remove cross top-right on hover */
+    .recent-demo-remove-btn {
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(11, 13, 18, 0.78);
+      color: var(--text-secondary);
+      font-size: 13px;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      z-index: 5;
+      transition: opacity 0.14s ease, background 0.14s ease, color 0.14s ease;
+    }
+    .recent-demo-card-wrap:hover .recent-demo-remove-btn {
+      opacity: 1;
+    }
+    .recent-demo-remove-btn:hover {
+      background: rgba(239, 68, 68, 0.85);
+      border-color: rgba(239, 68, 68, 0.95);
+      color: #fff;
+    }
+
+    /* Hover Popover under Recent Demo Card */
+    .recent-demo-popover {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      width: 215px;
+      background: rgba(15, 18, 26, 0.96);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(14px);
+      border-radius: 11px;
+      padding: 9px 12px;
+      box-shadow: 0 14px 32px rgba(0, 0, 0, 0.68);
+      opacity: 0;
+      transform: translateY(-4px);
+      pointer-events: none;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      z-index: 70;
+      font-size: 12px;
+    }
+    .recent-demo-popover.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .popover-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2px 0;
+      color: var(--text-secondary);
+    }
+    .popover-row strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    /* 4. PLAYER CARDS (Full width row, compact & clean, no overlap/overflow) */
+    .roster-section {
+      position: relative;
+      z-index: 15;
+      width: 100%;
+      clear: both;
+      padding: 4px 0;
+      margin: 0;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      backdrop-filter: none;
+      overflow: visible;
+    }
+    .roster-stage {
+      display: flex;
+      align-items: stretch;
+      justify-content: space-between;
+      width: 100%;
+      gap: 8px;
+      overflow: visible;
+    }
+    .roster-side {
+      flex: 5 1 0;
+      min-width: 0;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .roster-vs {
+      font-family: 'Barlow Condensed', 'Noto Sans', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--text-secondary);
+      padding: 0 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    .player-card {
+      position: relative;
+      flex: 1 1 0;
+      width: 100%;
+      min-width: 0;
+      height: 220px;
+      border-radius: 13px;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 0;
+      text-align: left;
+      overflow: hidden;
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    }
+    .player-card.team-ct {
+      background: linear-gradient(180deg, rgba(93, 121, 174, 0.06) 0%, rgba(93, 121, 174, 0.22) 100%);
+      border-color: rgba(93, 121, 174, 0.24);
+    }
+    .player-card.team-t {
+      background: linear-gradient(180deg, rgba(212, 165, 72, 0.06) 0%, rgba(212, 165, 72, 0.22) 100%);
+      border-color: rgba(212, 165, 72, 0.24);
+    }
+    .player-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(255, 255, 255, 0.35);
+    }
+    .player-card.active {
+      transform: translateY(-6px);
+      border-color: var(--accent-start);
+      box-shadow: 0 0 0 1px rgba(255, 179, 71, 0.65), 0 10px 24px rgba(255, 140, 50, 0.25);
+      background: linear-gradient(180deg, rgba(255, 179, 71, 0.12) 0%, rgba(255, 120, 50, 0.28) 100%);
+      z-index: 5;
+    }
+
+    .player-agent-wrap {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      pointer-events: none;
+      overflow: hidden;
+      border-radius: 12px;
+    }
+    .player-agent-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center top;
+      filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+      transition: transform 0.18s ease;
+    }
+    .player-card:hover .player-agent-img,
+    .player-card.active .player-agent-img {
+      transform: scale(1.04);
+    }
+    .player-custom-agent-badge {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      z-index: 3;
+      padding: 2px 6px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      border-radius: 5px;
+      background: rgba(255, 179, 71, 0.22);
+      border: 1px solid rgba(255, 179, 71, 0.45);
+      color: #ffca7a;
+      backdrop-filter: blur(4px);
+      pointer-events: none;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    }
+    .player-agent-silhouette-wrap {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      overflow: hidden;
+      border-radius: 12px;
+    }
+    .player-agent-silhouette {
+      width: 78%;
+      height: 84%;
+      opacity: 0.92;
+      filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+    }
+
+    .player-card-footer {
+      position: relative;
+      z-index: 2;
+      background: linear-gradient(180deg, rgba(11, 13, 18, 0.0) 0%, rgba(11, 13, 18, 0.85) 45%, rgba(11, 13, 18, 0.98) 100%);
+      padding: 22px 8px 8px;
+      border-radius: 0 0 12px 12px;
+      width: 100%;
+    }
+    .player-nick {
+      font-family: 'Barlow Condensed', 'Noto Sans', 'Noto Sans JP', 'Noto Sans Symbols 2', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+      line-height: 1.15;
+    }
+    .player-stats-line {
+      font-family: 'Barlow Condensed', 'Noto Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 2px;
+    }
+
+    /* ROUND TIMELINE BAR */
+    .timeline-wrap {
+      padding: 12px 18px 10px;
+      border-bottom: 1px solid var(--glass-border-subtle);
+      background: rgba(11, 13, 18, 0.32);
+    }
+    .timeline-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .timeline-strip {
+      display: flex;
+      align-items: stretch;
+      gap: 4px;
+      overflow-x: auto;
+      padding-top: 18px;
+      padding-bottom: 4px;
+    }
+    .timeline-half-sep {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0 5px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      border-left: 1px dashed rgba(255, 255, 255, 0.16);
+      border-right: 1px dashed rgba(255, 255, 255, 0.16);
+      user-select: none;
+    }
+    .round-cell {
+      position: relative;
+      flex: 1;
+      min-width: 36px;
+      height: 58px;
+      background: rgba(255, 255, 255, 0.045);
+      border: 1px solid var(--glass-border-subtle);
+      border-top: 3px solid rgba(255, 255, 255, 0.22);
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 3px 5px;
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+    }
+    .round-cell.side-ct {
+      border-top-color: var(--ct-color);
+    }
+    .round-cell.side-t {
+      border-top-color: var(--t-color);
+    }
+    .round-team-icon {
+      width: 15px;
+      height: 15px;
+      object-fit: contain;
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+      flex-shrink: 0;
+      pointer-events: none;
+      transition: transform 0.15s ease;
+    }
+    .round-cell:hover .round-team-icon {
+      transform: scale(1.15);
+    }
+    .round-cell:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateY(-2px);
+    }
+    .round-cell.selected {
+      background: rgba(255, 179, 71, 0.16);
+      border-color: rgba(255, 179, 71, 0.65);
+      border-top-color: var(--accent-start);
+      box-shadow: 0 4px 12px rgba(255, 138, 66, 0.2);
+    }
+    .round-cell-num {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      line-height: 1;
+    }
+    .round-cell.selected .round-cell-num {
+      color: var(--text-primary);
+    }
+    .round-cell-dots {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      flex-wrap: wrap;
+      min-height: 8px;
+    }
+    .kill-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-start);
+      box-shadow: 0 0 5px rgba(255, 179, 71, 0.8);
+    }
+    .death-bar-mark {
+      width: 12px;
+      height: 3px;
+      border-radius: 2px;
+      background: var(--danger);
+      opacity: 0.9;
+    }
+    .round-top-badge {
+      position: absolute;
+      top: -17px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      background: var(--accent-grad);
+      color: #111318;
+      white-space: nowrap;
+      pointer-events: auto;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+      transition: transform 0.14s ease, filter 0.14s ease;
+    }
+    .round-top-badge:hover {
+      transform: translateX(-50%) scale(1.08);
+      filter: brightness(1.08);
+    }
+
+    /* 6. LAYOUT: Table does NOT stretch to right column height; Right column is sticky */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 390px;
+      gap: 14px;
+      align-items: start;
+    }
+    @media (max-width: 1180px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .left-col {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    #moments-section {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      position: sticky;
+      top: 14px;
+      align-self: start;
+    }
+
+    /* Segmented Tabs */
+    .tabs {
+      display: inline-flex;
+      background: rgba(11, 13, 18, 0.65);
+      padding: 3px;
+      border-radius: 9px;
+      border: 1px solid var(--glass-border);
+    }
+    .tab-btn {
+      padding: 5px 13px;
+      border-radius: 6px;
+      font-family: 'Barlow Condensed', 'Noto Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      color: var(--text-secondary);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .tab-btn.active {
+      background: var(--accent-grad);
+      color: #111318;
+      font-weight: 700;
+    }
+    .tab-btn.active span {
+      color: #111318 !important;
+    }
+
+    /* 7. TABLE (~44px row height, hover highlight, compact camera eye toggle) */
+    .table-wrap {
+      padding: 4px 12px 8px;
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 4px;
+      text-align: left;
+    }
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(16, 20, 29, 0.94);
+      backdrop-filter: blur(8px);
+      color: var(--text-muted);
+      font-family: 'Barlow Condensed', 'Noto Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--glass-border);
+    }
+    tbody tr {
+      height: 48px;
+      background: rgba(255, 255, 255, 0.045);
+      transition: background-color 0.14s ease, box-shadow 0.14s ease;
+    }
+    tbody tr td {
+      height: 48px;
+      padding: 6px 12px;
+      font-size: 14px;
+      vertical-align: middle;
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+    tbody tr td:first-child {
+      border-left: 1px solid rgba(255, 255, 255, 0.07);
+      border-top-left-radius: 10px;
+      border-bottom-left-radius: 10px;
+    }
+    tbody tr td:last-child {
+      border-right: 1px solid rgba(255, 255, 255, 0.07);
+      border-top-right-radius: 10px;
+      border-bottom-right-radius: 10px;
+    }
+    tbody tr:hover {
+      background: rgba(255, 255, 255, 0.10);
+    }
+    tbody tr.row-selected {
+      background: linear-gradient(90deg, rgba(255, 179, 71, 0.14) 0%, rgba(255, 106, 61, 0.07) 100%);
+    }
+    tbody tr.row-selected:hover {
+      background: linear-gradient(90deg, rgba(255, 179, 71, 0.20) 0%, rgba(255, 106, 61, 0.12) 100%);
+    }
+    tbody tr.row-selected td {
+      border-top-color: rgba(255, 179, 71, 0.35);
+      border-bottom-color: rgba(255, 179, 71, 0.35);
+    }
+    tbody tr.row-selected td:first-child {
+      border-left-color: rgba(255, 179, 71, 0.55);
+    }
+    tbody tr.row-selected td:last-child {
+      border-right-color: rgba(255, 179, 71, 0.35);
+    }
+    tbody tr.row-focused {
+      outline: 1px solid var(--accent-start);
+    }
+
+    /* Compact Eye Icon Toggle Button for Camera column */
+    .cam-eye-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      border: 1px solid var(--glass-border);
+      background: rgba(11, 13, 18, 0.55);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .cam-eye-btn:hover {
+      border-color: rgba(255, 255, 255, 0.3);
+      color: var(--text-primary);
+    }
+    .cam-eye-btn.active {
+      background: var(--accent-subtle);
+      border-color: rgba(255, 179, 71, 0.55);
+      color: #ffc270;
+    }
+
+    /* Weapon Cell with Pill and Inline Modifiers */
+    .weapon-cell {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: nowrap;
+    }
+
+    /* Weapon Pill with Icon */
+    .weapon-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3px 8px;
+      min-width: 44px;
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(11, 13, 18, 0.65);
+      border: 1px solid var(--glass-border-subtle);
+      font-family: 'Barlow Condensed', 'Noto Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    }
+    .weapon-pill svg, .weapon-pill img {
+      height: 18px;
+      max-width: 58px;
+      width: auto;
+      object-fit: contain;
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+      opacity: 0.98;
+    }
+
+    /* Modifier Icon Pills */
+    .mod-icons {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .mod-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      border: 1px solid var(--glass-border);
+      background: rgba(11, 13, 18, 0.55);
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+    .mod-icon svg, .mod-icon img {
+      width: 13px;
+      height: 13px;
+    }
+    .mod-icon.hs {
+      color: #f87171;
+      background: rgba(239, 68, 68, 0.14);
+      border-color: rgba(239, 68, 68, 0.35);
+    }
+    .mod-icon.smoke {
+      color: #cbd5e1;
+      background: rgba(148, 163, 184, 0.14);
+      border-color: rgba(148, 163, 184, 0.3);
+    }
+    .mod-icon.blind {
+      color: #fbbf24;
+      background: rgba(245, 158, 11, 0.14);
+      border-color: rgba(245, 158, 11, 0.35);
+    }
+    .mod-icon.noscope {
+      color: #c084fc;
+      background: rgba(192, 132, 252, 0.14);
+      border-color: rgba(192, 132, 252, 0.35);
+    }
+    .mod-icon.airborne {
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.14);
+      border-color: rgba(56, 189, 248, 0.35);
+    }
+    .mod-icon.wallbang {
+      color: #fb923c;
+      background: rgba(251, 146, 60, 0.14);
+      border-color: rgba(251, 146, 60, 0.35);
+    }
+    .mod-icon.merged {
+      color: #ffc270;
+      background: var(--accent-subtle);
+      border-color: rgba(255, 179, 71, 0.4);
+      width: auto;
+      padding: 0 6px;
+      gap: 3px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* Hotkeys ? Button & Popover */
+    .hotkeys-help-wrap {
+      position: relative;
+      display: inline-flex;
+    }
+    .hotkeys-help-btn {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1px solid var(--glass-border);
+      background: rgba(11, 13, 18, 0.65);
+      color: var(--text-secondary);
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+    .hotkeys-help-btn:hover {
+      border-color: var(--accent-start);
+      color: var(--text-primary);
+    }
+    .hotkeys-popover {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      right: 0;
+      width: 240px;
+      background: rgba(15, 18, 26, 0.96);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(14px);
+      border-radius: 10px;
+      padding: 9px 12px;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.65);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(4px);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      z-index: 60;
+      font-size: 11.5px;
+    }
+    .hotkeys-help-wrap:hover .hotkeys-popover,
+    .hotkeys-help-btn:focus + .hotkeys-popover {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+    .card-header .hotkeys-popover {
+      top: calc(100% + 8px);
+      bottom: auto;
+      transform: translateY(-4px);
+    }
+
+    /* Collapsible Details Block (Log & Advanced Video Settings) */
+    details.collapsible-block {
+      border-top: 1px solid var(--glass-border-subtle);
+      padding-top: 8px;
+    }
+    details.collapsible-block > summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      user-select: none;
+      padding: 2px 0;
+    }
+    details.collapsible-block > summary::-webkit-details-marker {
+      display: none;
+    }
+    details.collapsible-block > summary::after {
+      content: "▾";
+      font-size: 12px;
+      color: var(--text-muted);
+      transition: transform 0.16s ease;
+    }
+    details.collapsible-block[open] > summary::after {
+      transform: rotate(180deg);
+    }
+
+    /* Checkbox */
+    .cb {
+      width: 16px;
+      height: 16px;
+      accent-color: #ff8c42;
+      cursor: pointer;
+      vertical-align: middle;
+    }
+
+    /* Progress Bar */
+    .progress-track {
+      width: 100%;
+      height: 7px;
+      background: rgba(11, 13, 18, 0.7);
+      border: 1px solid var(--glass-border-subtle);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--accent-grad);
+      width: 0%;
+      transition: width 0.25s ease;
+    }
+
+    /* Queue Item Drag & Drop */
+    .queue-item {
+      background: rgba(11, 13, 18, 0.55);
+      border: 1px solid var(--glass-border-subtle);
+      border-radius: 9px;
+      padding: 6px 9px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+      cursor: grab;
+      transition: background 0.14s, border-color 0.14s;
+    }
+    .queue-item:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--glass-border);
+    }
+    .queue-item.dragging {
+      opacity: 0.45;
+      border-color: var(--accent-start);
+    }
+    .queue-remove-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: color 0.14s, background 0.14s;
+    }
+    .queue-remove-btn:hover {
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.18);
+    }
+
+    /* Preset Pills */
+    .preset-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    .preset-btn {
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid var(--glass-border);
+      background: rgba(11, 13, 18, 0.5);
+      color: var(--text-secondary);
+      font-family: 'Barlow Condensed', 'Noto Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: center;
+    }
+    .preset-btn:hover, .preset-btn.active {
+      background: var(--accent-subtle);
+      border-color: var(--accent-start);
+      color: #ffd089;
+    }
+
+    /* Terminal Log */
+    .log-box {
+      background: rgba(8, 10, 14, 0.72);
+      border: 1px solid var(--glass-border-subtle);
+      border-radius: 10px;
+      padding: 8px 10px;
+      height: 120px;
+      overflow-y: auto;
+      font-size: 11px;
+      line-height: 1.5;
+      margin-top: 6px;
+    }
+
+    /* Skeleton & Empty State */
+    .skeleton-pulse {
+      background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.04) 75%);
+      background-size: 200% 100%;
+      animation: skelShimmer 1.4s infinite;
+      border-radius: 12px;
+    }
+    @keyframes skelShimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 8, 12, 0.78);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+    .modal-backdrop.open {
+      display: flex;
+    }
+    .modal-card {
+      background: rgba(18, 22, 31, 0.94);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(16px);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 580px;
+      overflow: hidden;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.65);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Ambient Map-Reactive Blurred Background -->
+  <div class="ambient-canvas" aria-hidden="true">
+    <div class="ambient-blob b1"></div>
+    <div class="ambient-blob b2"></div>
+    <div class="ambient-blob b3"></div>
+  </div>
+
+  <div class="workspace">
+    <!-- 1. ВЕРХНЯЯ ПАНЕЛЬ -->
+    <header id="dropzone" class="demo-bar">
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0;">
+        <input id="file-input" type="file" accept=".dem,.bz2,.gz,.zip" class="hidden" onchange="if(this.files[0]) uploadDemoFile(this.files[0])" />
+        <button onclick="document.getElementById('file-input').click()" class="btn btn-primary" title="Выбрать локальный файл .dem или архив .dem.bz2" aria-label="Загрузить .dem">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Загрузить .dem
+        </button>
+
+        <div id="demo-empty-hint" style="color: var(--text-secondary); font-size: 12.5px;">
+          Перетащите <span class="mono" style="color: var(--text-primary);">.dem / .dem.bz2</span>
+        </div>
+
+        <div id="demo-summary" class="hidden" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span id="meta-demo-name" class="mono hidden"></span>
+          <span id="meta-map" class="badge badge-accent mono" style="font-size: 12.5px; padding: 3px 8px;"></span>
+          <span id="meta-rounds" class="condensed" style="font-size: 14px; font-weight: 600; color: var(--text-secondary);"></span>
+          <span style="color: var(--glass-border);">|</span>
+          <span id="meta-duration" class="mono" style="font-size: 12px; color: var(--text-secondary);"></span>
+        </div>
+
+        <div id="parse-loading" class="hidden" style="display: flex; align-items: center; gap: 6px; color: var(--accent-start); font-size: 12.5px; font-weight: 600;">
+          <span id="parse-loading-text">Парсинг демки...</span>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 7px; flex-wrap: wrap;">
+        <div class="path-popover-wrap" id="path-popover-wrap">
+          <button type="button" id="btn-toggle-path-popover" onclick="togglePathPopover(event)" class="btn btn-xs" title="Загрузить демку по ссылке csstats.gg, коду steam:// или локальному пути" aria-label="Загрузить по ссылке или пути">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            Загрузить по ссылке / пути
+          </button>
+          <div id="path-popover" class="path-popover" onclick="event.stopPropagation()">
+            <input id="demo-path-input" type="text" placeholder="Ссылка csstats.gg / .dem.bz2, код steam:// или путь к .dem..." onkeydown="if(event.key==='Enter'){closePathPopover();parseByLocalPath();}" class="input mono" style="flex: 1; font-size: 11.5px;" aria-label="Ссылка или путь к демке" />
+            <button type="button" onclick="closePathPopover();parseByLocalPath();" class="btn btn-primary btn-xs" title="Загрузить" aria-label="Открыть демку">Открыть</button>
+          </div>
+        </div>
+        <button onclick="openSettingsModal()" class="btn btn-xs" title="Пути к CS2, HLAE и FFmpeg" aria-label="Настройки путей">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Пути
+        </button>
+      </div>
+    </header>
+
+    <!-- 2. ЛЕНТА «ПОСЛЕДНИЕ ДЕМКИ» (без панели и заголовка — карточки прямо на фоне) -->
+    <section id="recent-demos-section" class="recent-demos-strip">
+      <div id="recent-demos-track" class="recent-demos-track"></div>
+      <div id="recent-demo-floating-popover" class="recent-demo-popover"></div>
+    </section>
+
+    <!-- SKELETON ПРИ ЗАГРУЗКЕ ДЕМКИ (показывается только если данных нет в кеше) -->
+    <div id="skeleton-loader" class="hidden" style="display: flex; flex-direction: column; gap: 14px;">
+      <div class="skeleton-pulse" style="height: 220px;"></div>
+      <div class="skeleton-pulse" style="height: 420px;"></div>
+    </div>
+
+    <!-- 3. КАРТОЧКИ ИГРОКОВ НА ВСЮ ШИРИНУ (5 CT · VS · 5 T, без панели вокруг ряда) -->
+    <section id="players-section" class="roster-section hidden">
+      <div id="players-grid" class="roster-stage"></div>
+    </section>
+
+    <!-- ОСНОВНАЯ РАБОЧАЯ СЕТКА: СЛЕВА МОМЕНТЫ И ТАЙМЛАЙН, СПРАВА СБОРКА И НАСТРОЙКИ -->
+    <div id="workspace-grid" class="main-grid">
+      <div class="left-col">
+        <!-- ПУСТОЕ СОСТОЯНИЕ, ПОКА ДЕМКА НЕ ЗАГРУЖЕНА -->
+        <section id="empty-workspace-state" class="card" style="padding: 48px 24px; text-align: center;">
+          <div class="condensed" style="font-size: 24px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.04em; text-transform: uppercase;">
+            Загрузите демку
+          </div>
+          <p style="color: var(--text-secondary); font-size: 13.5px; max-width: 480px; margin: 8px auto 18px;">
+            Перетащите файл <span class="mono">.dem / .dem.bz2</span> в верхнюю панель или выберите карточку сверху.
+          </p>
+          <button onclick="document.getElementById('file-input').click()" class="btn btn-primary">
+            Выбрать файл .dem
+          </button>
+        </section>
+
+        <!-- ТАЙМЛАЙН РАУНДОВ + ФИЛЬТРЫ + ТАБЛИЦА МОМЕНТОВ -->
+        <section id="moments-section" class="card hidden">
+          <!-- Шапка: Моменты: ник (25K / 14D) + быстрые кнопки выбора -->
+          <div class="card-header">
+            <div class="card-title">
+              <span>Моменты:</span>
+              <span id="active-player-label" class="nick-text" style="color: var(--accent-start); font-size: 16px;">—</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <button onclick="selectAllKills(true)" class="btn btn-xs" title="Выбрать все киллы игрока">Все киллы</button>
+              <button onclick="selectOnlyHighlights()" class="btn btn-xs" title="Выбрать только раунды с 2+ киллами и клатчи">Все 2K+ и клатчи</button>
+              <button onclick="selectAllDeaths(true)" class="btn btn-xs" title="Выбрать все смерти игрока">Все смерти</button>
+              <button onclick="clearAllSelections()" class="btn btn-xs" title="Снять выбор со всех моментов (Esc)">Сбросить</button>
+              <div class="hotkeys-help-wrap">
+                <button type="button" class="hotkeys-help-btn" title="Горячие клавиши" aria-label="Горячие клавиши">?</button>
+                <div class="hotkeys-popover">
+                  <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">Горячие клавиши</div>
+                  <div class="popover-row"><span>Отметить строку</span><strong class="mono">Space</strong></div>
+                  <div class="popover-row"><span>Запустить рендер</span><strong class="mono">Enter</strong></div>
+                  <div class="popover-row"><span>Сбросить выбор</span><strong class="mono">Esc</strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ТАЙМЛАЙН РАУНДОВ -->
+          <div id="round-timeline-bar" class="timeline-wrap">
+            <div id="round-timeline-cells" class="timeline-strip"></div>
+            <div id="groups-bar" class="hidden" style="display: none !important;">
+              <div id="groups-container"></div>
+            </div>
+          </div>
+
+          <!-- ПАНЕЛЬ ФИЛЬТРОВ И ТАЙМИНГОВ -->
+          <div style="padding: 10px 18px; border-bottom: 1px solid var(--glass-border-subtle); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <div class="tabs">
+                <button id="tab-kills" onclick="switchTab('kills')" class="tab-btn active">
+                  Киллы <span id="tab-kills-count" class="mono" style="font-size: 12px; color: var(--text-secondary);">0</span>
+                </button>
+                <button id="tab-deaths" onclick="switchTab('deaths')" class="tab-btn">
+                  Смерти <span id="tab-deaths-count" class="mono" style="font-size: 12px; color: var(--text-secondary);">0</span>
+                </button>
+              </div>
+              <select id="filter-round" onchange="onFilterChange()" class="select" style="font-size: 12px; padding: 5px 9px;" aria-label="Фильтр по раунду">
+                <option value="all">Все раунды</option>
+              </select>
+              <select id="filter-weapon" onchange="onFilterChange()" class="select" style="font-size: 12px; padding: 5px 9px;" aria-label="Фильтр по оружию">
+                <option value="all">Все оружия</option>
+              </select>
+            </div>
+
+            <!-- Настройки авто-склейки и отступов ДО/ПОСЛЕ -->
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--text-secondary);">
+              <span title="Пауза между соседними киллами в одном раунде для авто-склейки">Слияние &lt;</span>
+              <div class="stepper">
+                <button type="button" class="stepper-btn" onclick="stepGlobalInput('opt-merge-gap', -0.5)" title="Уменьшить паузу" aria-label="Уменьшить паузу">−</button>
+                <input id="opt-merge-gap" type="number" step="0.5" min="0" max="30" value="5.0" onchange="onGlobalTimingChange()" class="input input-num mono" title="Секунд между соседними киллами для слияния в один клип" />
+                <button type="button" class="stepper-btn" onclick="stepGlobalInput('opt-merge-gap', 0.5)" title="Увеличить паузу" aria-label="Увеличить паузу">+</button>
+              </div>
+              <span>с</span>
+              <span style="color: var(--glass-border);">|</span>
+              <span>Килл ДО/ПОСЛЕ:</span>
+              <div class="stepper">
+                <button type="button" class="stepper-btn" onclick="stepGlobalInput('opt-kill-pre', -0.5)" title="Уменьшить ДО" aria-label="Уменьшить ДО">−</button>
+                <input id="opt-kill-pre" type="number" step="0.5" min="0.5" max="15" value="2.0" onchange="applyDefaultKillOffsets()" class="input input-num mono" title="Секунд до килла" />
+                <button type="button" class="stepper-btn" onclick="stepGlobalInput('opt-kill-pre', 0.5)" title="Увеличить ДО" aria-label="Увеличить ДО">+</button>
+              </div>
+              <div class="stepper">
+                <button type="button" class="stepper-btn" onclick="stepGlobalInput('opt-kill-post', -0.5)" title="Уменьшить ПОСЛЕ" aria-label="Уменьшить ПОСЛЕ">−</button>
+                <input id="opt-kill-post" type="number" step="0.5" min="0.5" max="15" value="2.0" onchange="applyDefaultKillOffsets()" class="input input-num mono" title="Секунд после килла" />
+                <button type="button" class="stepper-btn" onclick="stepGlobalInput('opt-kill-post', 0.5)" title="Увеличить ПОСЛЕ" aria-label="Увеличить ПОСЛЕ">+</button>
+              </div>
+              <span style="color: var(--glass-border);">|</span>
+              <span>Смерть -N/+M:</span>
+              <div class="stepper">
+                <button type="button" class="stepper-btn" onclick="stepGlobalInput('opt-death-pre', -0.5)" title="Уменьшить ДО" aria-label="Уменьшить ДО">−</button>
+                <input id="opt-death-pre" type="number" step="0.5" min="0.5" max="15" value="4.0" onchange="applyDefaultDeathOffsets()" class="input input-num mono" title="Секунд до смерти" />
+                <button type="button" class="stepper-btn" onclick="stepGlobalInput('opt-death-pre', 0.5)" title="Увеличить ДО" aria-label="Увеличить ДО">+</button>
+              </div>
+              <div class="stepper">
+                <button type="button" class="stepper-btn" onclick="stepGlobalInput('opt-death-post', -0.5)" title="Уменьшить ПОСЛЕ" aria-label="Уменьшить ПОСЛЕ">−</button>
+                <input id="opt-death-post" type="number" step="0.5" min="0.5" max="15" value="1.5" onchange="applyDefaultDeathOffsets()" class="input input-num mono" title="Секунд после смерти" />
+                <button type="button" class="stepper-btn" onclick="stepGlobalInput('opt-death-post', 0.5)" title="Увеличить ПОСЛЕ" aria-label="Увеличить ПОСЛЕ">+</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ТАБЛИЦА КИЛЛОВ -->
+          <div id="panel-kills" class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 42px; text-align: center;">
+                    <input id="cb-all-kills" type="checkbox" onchange="selectAllKills(this.checked)" class="cb" title="Выбрать или снять все киллы" aria-label="Выбрать все киллы" />
+                  </th>
+                  <th style="width: 52px; text-align: center;">Раунд</th>
+                  <th style="width: 150px;">Оружие</th>
+                  <th>Жертва</th>
+                  <th style="width: 160px;">
+                    <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer;" title="Включить повтор от лица жертвы после каждого килла">
+                      <input id="cb-all-victim-replays" type="checkbox" onchange="toggleAllVictimReplays(this.checked)" class="cb" />
+                      <span>Повтор от жертвы</span>
+                    </label>
+                  </th>
+                  <th style="width: 104px; text-align: center;">ДО (с)</th>
+                  <th style="width: 104px; text-align: center;">ПОСЛЕ (с)</th>
+                </tr>
+              </thead>
+              <tbody id="kills-tbody"></tbody>
+            </table>
+          </div>
+
+          <!-- ТАБЛИЦА СМЕРТЕЙ -->
+          <div id="panel-deaths" class="table-wrap hidden">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 42px; text-align: center;">
+                    <input id="cb-all-deaths" type="checkbox" onchange="selectAllDeaths(this.checked)" class="cb" title="Выбрать или снять все смерти" aria-label="Выбрать все смерти" />
+                  </th>
+                  <th style="width: 52px; text-align: center;">Раунд</th>
+                  <th>Кем убит</th>
+                  <th style="width: 150px;">Оружие</th>
+                  <th style="width: 86px; text-align: center;">
+                    <div style="display: inline-flex; align-items: center; gap: 5px;">
+                      <span>Камера</span>
+                      <button type="button" id="btn-all-deaths-pov" onclick="toggleAllDeathsPov()" class="cam-eye-btn active" style="width: 22px; height: 22px;" title="Переключить камеру для всех смертей (от лица убийцы / от своего лица)" aria-label="Переключить камеру для всех строк">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      </button>
+                    </div>
+                  </th>
+                  <th style="width: 104px; text-align: center;">ДО (-N с)</th>
+                  <th style="width: 104px; text-align: center;">ПОСЛЕ (+M с)</th>
+                </tr>
+              </thead>
+              <tbody id="deaths-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <!-- ПРАВАЯ ЛИПКАЯ КОЛОНКА (sticky) -->
+      <aside class="right-col">
+        <!-- Карточка «Сборка мувика» -->
+        <section class="card">
+          <!-- Скрытые элементы сводки для сохранения всех существующих id -->
+          <div class="hidden" aria-hidden="true">
+            <div id="render-quick-sub"></div>
+            <span id="render-stage-badge"></span>
+            <div id="summary-clips-count">0</div>
+            <div id="summary-duration">0.0 с</div>
+            <span id="summary-kills-count">0</span>
+            <span id="summary-deaths-count">0</span>
+          </div>
+
+          <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 12px;">
+            <!-- Главная кнопка РЕНДЕР MP4 · N клипов · M с -->
+            <div style="display: flex; gap: 8px;">
+              <button id="btn-start-render" onclick="startRenderJob()" disabled class="btn btn-primary btn-cta-pill" style="flex: 1;" title="Запустить рендер мувика в MP4 (Enter)">
+                Рендер MP4
+              </button>
+              <button id="btn-cancel-render" onclick="cancelRenderJob()" class="btn btn-danger hidden" style="padding: 10px 14px; border-radius: 999px;" title="Остановить рендер">
+                Отмена
+              </button>
+            </div>
+
+            <!-- Прогресс-бар (появляется только во время рендера) -->
+            <div id="render-progress-wrap" class="hidden">
+              <div style="display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-secondary); margin-bottom: 5px;">
+                <span id="progress-label">Рендер...</span>
+                <span id="progress-pct" class="mono">0%</span>
+              </div>
+              <div class="progress-track">
+                <div id="progress-bar" class="progress-fill"></div>
+              </div>
+            </div>
+
+            <!-- Баннер завершения -->
+            <div id="done-banner" class="hidden" style="background: var(--success-subtle); border: 1px solid rgba(34, 197, 94, 0.4); border-radius: 10px; padding: 9px 12px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                <div style="min-width: 0;">
+                  <div style="font-size: 12px; font-weight: 700; color: #4ade80;">Мувик готов</div>
+                  <div id="done-file-path" class="mono" style="font-size: 10.5px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
+                </div>
+                <button onclick="openOutputFolder()" class="btn btn-xs" style="flex-shrink: 0;">Показать</button>
+              </div>
+            </div>
+
+            <!-- Очередь клипов (Drag & Drop + удаление) -->
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <span style="font-size: 11.5px; font-weight: 600; color: var(--text-secondary);">Очередь клипов</span>
+              </div>
+              <div id="clip-queue-preview" style="max-height: 190px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; padding-right: 2px;">
+                <div style="font-size: 11.5px; color: var(--text-muted); padding: 4px 0;">Нет выбранных моментов</div>
+              </div>
+            </div>
+
+            <!-- Сворачиваемый Лог -->
+            <details id="render-log-details" class="collapsible-block">
+              <summary>
+                <span>Лог</span>
+                <span onclick="event.preventDefault();event.stopPropagation();clearRenderLog();" style="color: var(--text-muted); font-size: 11px; font-weight: 500; margin-left: auto; margin-right: 8px;" title="Очистить журнал событий">Очистить</span>
+              </summary>
+              <div id="render-log" class="log-box mono">
+                <div style="color: var(--text-muted);">Готов к работе.</div>
+              </div>
+            </details>
+          </div>
+        </section>
+
+        <!-- Карточка «Параметры видео» -->
+        <section class="card">
+          <div class="card-header">
+            <div class="card-title">Параметры видео</div>
+          </div>
+          <div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 10px;">
+            <!-- Скрытые элементы настроек для полной сохранности логики и DOM ID -->
+            <div class="hidden" aria-hidden="true" style="display:none !important;">
+              <select id="opt-fps" onchange="updateQuickRenderSub()">
+                <option value="144" selected>144 FPS</option>
+              </select>
+              <select id="opt-encoder">
+                <option value="h264_nvenc" selected>NVENC (GPU)</option>
+              </select>
+              <button type="button" id="preset-yt"></button>
+              <button type="button" id="preset-tt"></button>
+              <button type="button" id="preset-draft"></button>
+              <details id="video-advanced-details"><summary></summary></details>
+            </div>
+
+            <!-- Единая строка: Разрешение, CRF и Битрейт -->
+            <div style="display: grid; grid-template-columns: 1fr 76px 84px; gap: 8px;">
+              <div>
+                <label class="form-label" for="opt-resolution">Разрешение</label>
+                <select id="opt-resolution" onchange="updateQuickRenderSub()" class="select" style="width: 100%;">
+                  <optgroup label="16:9 (Широкоэкранное)">
+                    <option value="1920x1080" selected>1920×1080 (16:9 1080p)</option>
+                    <option value="2560x1440">2560×1440 (16:9 1440p)</option>
+                    <option value="1280x720">1280×720 (16:9 720p)</option>
+                  </optgroup>
+                  <optgroup label="4:3 Растянутое (в 1920×1080 без полос)">
+                    <option value="1440x1080_stretch">1440×1080 → 1080p (4:3 Растянутое)</option>
+                    <option value="1280x960_stretch">1280×960 → 1080p (4:3 Растянутое)</option>
+                    <option value="1024x768_stretch">1024×768 → 1080p (4:3 Растянутое)</option>
+                  </optgroup>
+                </select>
+              </div>
+              <div>
+                <label class="form-label" for="opt-crf">CRF / CQ</label>
+                <input id="opt-crf" type="number" min="10" max="35" value="18" class="input mono" style="width: 100%;" />
+              </div>
+              <div>
+                <label class="form-label" for="opt-bitrate">Битрейт</label>
+                <input id="opt-bitrate" type="text" value="20M" class="input mono" style="width: 100%;" />
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 7px; padding-top: 2px;">
+              <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                <span style="font-size: 12.5px; color: var(--text-primary); font-weight: 500;">Повтор килла от лица жертвы</span>
+                <input id="opt-victim-replay" type="checkbox" onchange="toggleAllVictimReplays(this.checked)" class="cb" />
+              </label>
+              <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                <span style="font-size: 12.5px; color: var(--text-primary); font-weight: 500;">Включить ВХ (X-Ray силуэты)</span>
+                <input id="opt-xray" type="checkbox" class="cb" />
+              </label>
+              <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                <span style="font-size: 12.5px; color: var(--text-secondary);">Оставить полный игровой HUD</span>
+                <input id="opt-hud" type="checkbox" class="cb" />
+              </label>
+              <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                <span style="font-size: 12.5px; color: var(--text-secondary);">Плавный кроссфейд (0.2 сек)</span>
+                <input id="opt-crossfade" type="checkbox" checked class="cb" />
+              </label>
+            </div>
+
+            <div>
+              <label class="form-label" for="opt-output-name">Имя выходного файла (необязательно)</label>
+              <input id="opt-output-name" type="text" value="" autocomplete="off" placeholder="CS2_<карта>_<ник>_<дата>.mp4" class="input mono" style="width: 100%;" />
+            </div>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Модальное окно настроек путей -->
+  <div id="settings-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="card-header">
+        <div class="card-title">Пути и окружение (CS2 / HLAE / FFmpeg)</div>
+        <button onclick="closeSettingsModal()" class="btn btn-xs" title="Закрыть окно настроек" aria-label="Закрыть">Закрыть</button>
+      </div>
+      <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+        <div>
+          <label class="form-label" for="cfg-cs2-path">Путь к cs2.exe</label>
+          <input id="cfg-cs2-path" type="text" class="input mono" style="width: 100%;" />
+        </div>
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label class="form-label" for="cfg-hlae-path" style="margin-bottom: 0;">Путь к HLAE.exe</label>
+            <button onclick="autoDownloadHlae()" id="btn-dl-hlae" class="btn btn-xs">Скачать HLAE</button>
+          </div>
+          <input id="cfg-hlae-path" type="text" class="input mono" style="width: 100%;" />
+        </div>
+        <div>
+          <label class="form-label" for="cfg-ffmpeg-path">Путь к ffmpeg.exe</label>
+          <input id="cfg-ffmpeg-path" type="text" class="input mono" style="width: 100%;" />
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label class="form-label" for="cfg-backend">Режим захвата</label>
+            <select id="cfg-backend" class="select" style="width: 100%;">
+              <option value="auto">Авто (HLAE + CS2)</option>
+              <option value="hlae">HLAE (mirv_streams)</option>
+              <option value="simulation">Тестовая генерация (без CS2)</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="cfg-output-dir">Папка сохранения видео</label>
+            <input id="cfg-output-dir" type="text" class="input mono" style="width: 100%;" />
+          </div>
+        </div>
+      </div>
+      <div style="padding: 12px 16px; border-top: 1px solid var(--glass-border-subtle); display: flex; justify-content: flex-end; gap: 8px; background: rgba(11, 13, 18, 0.55);">
+        <button onclick="closeSettingsModal()" class="btn">Отмена</button>
+        <button onclick="saveAppSettings()" class="btn btn-primary">Сохранить</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    // Склонение числительных: «1 клип / 2–4 клипа / 5+ клипов»
+    function pluralizeClips(n) {
+      const abs = Math.abs(Number(n) || 0);
+      const mod10 = abs % 10;
+      const mod100 = abs % 100;
+      if (mod10 === 1 && mod100 !== 11) return `${abs} клип`;
+      if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${abs} клипа`;
+      return `${abs} клипов`;
+    }
+
+    // Учёт и вывод в консоль списка недостающих иконок оружия и модификаторов
+    const missingIconsSet = new Set();
+    let missingIconsLogTimer = null;
+
+    function reportMissingIcon(iconFile, imgEl, showNextFallback = false) {
+      if (imgEl) {
+        imgEl.style.display = 'none';
+        if (showNextFallback && imgEl.nextElementSibling) {
+          imgEl.nextElementSibling.style.display = 'block';
+        }
+      }
+      if (iconFile && !missingIconsSet.has(iconFile)) {
+        missingIconsSet.add(iconFile);
+        if (missingIconsLogTimer) clearTimeout(missingIconsLogTimer);
+        missingIconsLogTimer = setTimeout(() => {
+          console.warn('[CS2 Movie Maker] Недостающие иконки оружия/модификаторов:', Array.from(missingIconsSet));
+        }, 250);
+      }
+    }
+
+    // Учёт и вывод в консоль списка недостающих карт (фонов /static/maps/<map>.jpg и иконок /static/maps/icons/<map>.svg)
+    const missingMapsSet = new Set();
+    let missingMapsLogTimer = null;
+
+    function reportMissingMapAsset(assetPath, imgEl) {
+      if (imgEl) {
+        imgEl.style.display = 'none';
+      }
+      if (assetPath && !missingMapsSet.has(assetPath)) {
+        missingMapsSet.add(assetPath);
+        if (missingMapsLogTimer) clearTimeout(missingMapsLogTimer);
+        missingMapsLogTimer = setTimeout(() => {
+          console.warn('[CS2 Movie Maker] Недостающие файлы карт (/static/maps/):', Array.from(missingMapsSet));
+        }, 250);
+      }
+    }
+
+    // Однократная предзагрузка и кеширование статусов картинок карт и агентов
+    const assetStatusCache = new Map(); // url -> 'ok' | 'missing' | 'loading'
+    const preloadedImages = new Map();
+
+    function preloadImageOnce(url, onMissingReportKey) {
+      if (assetStatusCache.has(url)) return assetStatusCache.get(url);
+      assetStatusCache.set(url, 'loading');
+      const img = new Image();
+      img.onload = () => {
+        assetStatusCache.set(url, 'ok');
+      };
+      img.onerror = () => {
+        assetStatusCache.set(url, 'missing');
+        if (onMissingReportKey) {
+          reportMissingMapAsset(onMissingReportKey, null);
+        }
+      };
+      img.src = url;
+      preloadedImages.set(url, img);
+      return 'loading';
+    }
+
+    function sanitizeMapName(mapName) {
+      if (!mapName) return 'de_mirage';
+      let clean = String(mapName).toLowerCase().trim();
+      if (clean.includes('/')) clean = clean.split('/').pop();
+      if (clean.includes('\\')) clean = clean.split('\\').pop();
+      clean = clean.replace(/\.bsp$/, '').trim();
+      return clean || 'de_mirage';
+    }
+
+    function getMapThumbUrl(clean) {
+      return `/static/maps/${encodeURIComponent(clean)}.jpg`;
+    }
+
+    function getMapIconUrl(clean) {
+      return `/static/maps/icons/${encodeURIComponent(clean)}.png`;
+    }
+
+    function getMurkyMapThumbUrl(clean) {
+      return `https://raw.githubusercontent.com/MurkyYT/cs2-map-icons/main/images/thumbs/${encodeURIComponent(clean)}_1_png.png`;
+    }
+
+    function getMurkyMapIconUrl(clean) {
+      return `https://raw.githubusercontent.com/MurkyYT/cs2-map-icons/main/images/${encodeURIComponent(clean)}.png`;
+    }
+
+    function ensureMapAssetsChecked(mapName) {
+      const clean = sanitizeMapName(mapName);
+      const jpgUrl = getMapThumbUrl(clean);
+      const iconUrl = getMapIconUrl(clean);
+      preloadImageOnce(jpgUrl, `/static/maps/${clean}.jpg`);
+      preloadImageOnce(iconUrl, `/static/maps/icons/${clean}.png`);
+    }
+
+    function preloadAgentAssetsOnce() {
+      const urls = ['/static/agents/default_ct.png', '/static/agents/default_t.png'];
+      for (let i = 1; i <= 5; i++) {
+        urls.push(`/static/agents/ct_${i}.png`, `/static/agents/t_${i}.png`);
+      }
+      urls.forEach(u => preloadImageOnce(u, null));
+    }
+
+    // Поповер ввода ссылки/пути в верхней панели
+    function togglePathPopover(ev) {
+      if (ev) ev.stopPropagation();
+      const pop = document.getElementById('path-popover');
+      if (!pop) return;
+      const isOpen = pop.classList.toggle('open');
+      if (isOpen) {
+        const inp = document.getElementById('demo-path-input');
+        if (inp) setTimeout(() => inp.focus(), 20);
+      }
+    }
+
+    function closePathPopover() {
+      const pop = document.getElementById('path-popover');
+      if (pop) pop.classList.remove('open');
+    }
+
+    document.addEventListener('click', (e) => {
+      const wrap = document.getElementById('path-popover-wrap');
+      if (wrap && !wrap.contains(e.target)) {
+        closePathPopover();
+      }
+    });
+
+    // Иконки модификаторов: загрузка оригинальных иконок киллфида CS2 из /static/icons/<mod>.svg
+    const MOD_SVGS = {
+      hs: `<span class="mod-icon hs" title="Хедшот (в голову)" aria-label="Хедшот"><img src="/static/icons/headshot.svg" alt="" /></span>`,
+      wallbang: `<span class="mod-icon wallbang" title="Прострел стены" aria-label="Прострел"><img src="/static/icons/penetrate.svg" alt="" /></span>`,
+      smoke: `<span class="mod-icon smoke" title="Прострел через дым" aria-label="Через дым"><img src="/static/icons/smoke.svg" alt="" /></span>`,
+      blind: `<span class="mod-icon blind" title="Вслепую (под флешкой)" aria-label="Вслепую"><img src="/static/icons/blind.svg" alt="" /></span>`,
+      noscope: `<span class="mod-icon noscope" title="Без прицела (NoScope)" aria-label="Без прицела"><img src="/static/icons/noscope.svg" alt="" /></span>`,
+      airborne: `<span class="mod-icon airborne" title="В прыжке (Airborne)" aria-label="В прыжке"><img src="/static/icons/airborne.svg" alt="" /></span>`,
+      merged: (idx) => `<span class="mod-icon merged" title="Склеен в клип #${idx}" aria-label="Склеен в клип #${idx}"><img src="/static/icons/merged.svg" alt="" />#${idx}</span>`
+    };
+
+    // Тематические палитры карт (для фоновых пятен и карточек «Последние демки»)
+    const MAP_THEMES = {
+      de_anubis:   { grad: 'linear-gradient(135deg, #6e4f28 0%, #362717 100%)', a1: 'rgba(218, 152, 72, 0.25)', a2: 'rgba(130, 88, 42, 0.20)', a3: 'rgba(255, 140, 66, 0.14)' },
+      de_mirage:   { grad: 'linear-gradient(135deg, #87552d 0%, #3d2616 100%)', a1: 'rgba(228, 138, 68, 0.25)', a2: 'rgba(156, 86, 48, 0.20)', a3: 'rgba(255, 118, 61, 0.14)' },
+      de_inferno:  { grad: 'linear-gradient(135deg, #6e332a 0%, #331815 100%)', a1: 'rgba(214, 88, 68, 0.24)',  a2: 'rgba(148, 62, 45, 0.20)', a3: 'rgba(255, 125, 68, 0.14)' },
+      de_nuke:     { grad: 'linear-gradient(135deg, #2b4560 0%, #162333 100%)', a1: 'rgba(72, 138, 212, 0.25)', a2: 'rgba(52, 96, 158, 0.22)', a3: 'rgba(93, 121, 174, 0.16)' },
+      de_ancient:  { grad: 'linear-gradient(135deg, #27523b 0%, #13291d 100%)', a1: 'rgba(62, 168, 108, 0.24)', a2: 'rgba(40, 112, 74, 0.20)', a3: 'rgba(212, 165, 72, 0.12)' },
+      de_dust2:    { grad: 'linear-gradient(135deg, #756338 0%, #362e1a 100%)', a1: 'rgba(212, 175, 85, 0.24)', a2: 'rgba(142, 115, 58, 0.20)', a3: 'rgba(255, 150, 71, 0.13)' },
+      de_overpass: { grad: 'linear-gradient(135deg, #35545c 0%, #19282c 100%)', a1: 'rgba(78, 154, 172, 0.23)', a2: 'rgba(93, 121, 174, 0.18)', a3: 'rgba(212, 165, 72, 0.12)' },
+      de_vertigo:  { grad: 'linear-gradient(135deg, #384d6b 0%, #1a2433 100%)', a1: 'rgba(96, 148, 218, 0.24)', a2: 'rgba(72, 105, 162, 0.20)', a3: 'rgba(255, 140, 66, 0.12)' },
+      de_train:    { grad: 'linear-gradient(135deg, #424b57 0%, #1e2329 100%)', a1: 'rgba(115, 135, 162, 0.22)', a2: 'rgba(82, 102, 132, 0.18)', a3: 'rgba(255, 120, 60, 0.12)' }
+    };
+
+    const RECENT_STORAGE_KEY = 'cs2mm_recent_demos_v1';
+    const DEMO_UI_STATE_KEY = 'cs2mm_demo_ui_state_v1';
+
+    // 3б. Фронтенд-кеш демок: объект Map в памяти + IndexedDB
+    const demoMemoryCache = new Map();
+    const IDB_NAME = 'cs2mm_demo_cache_db';
+    const IDB_STORE = 'demos';
+
+    function getDemoCacheKey(demoOrItem) {
+      if (!demoOrItem) return '';
+      return String(demoOrItem.demo_path || demoOrItem.demo_name || '').trim();
+    }
+
+    function openDemoCacheIdb() {
+      return new Promise((resolve) => {
+        if (!window.indexedDB) return resolve(null);
+        try {
+          const req = indexedDB.open(IDB_NAME, 1);
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(IDB_STORE)) {
+              db.createObjectStore(IDB_STORE);
+            }
+          };
+          req.onsuccess = (e) => resolve(e.target.result);
+          req.onerror = () => resolve(null);
+        } catch (_) {
+          resolve(null);
+        }
+      });
+    }
+
+    async function getCachedDemo(key) {
+      if (!key) return null;
+      if (demoMemoryCache.has(key)) {
+        return demoMemoryCache.get(key);
+      }
+      const db = await openDemoCacheIdb();
+      if (!db) return null;
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction(IDB_STORE, 'readonly');
+          const store = tx.objectStore(IDB_STORE);
+          const req = store.get(key);
+          req.onsuccess = () => {
+            const val = req.result || null;
+            if (val && val.players) {
+              demoMemoryCache.set(key, val);
+              if (val.demo_name) demoMemoryCache.set(val.demo_name, val);
+            }
+            resolve(val);
+          };
+          req.onerror = () => resolve(null);
+        } catch (_) {
+          resolve(null);
+        }
+      });
+    }
+
+    async function setCachedDemo(demo) {
+      if (!demo || !demo.players) return;
+      const key = getDemoCacheKey(demo);
+      if (!key) return;
+      demoMemoryCache.set(key, demo);
+      if (demo.demo_name) demoMemoryCache.set(demo.demo_name, demo);
+      const db = await openDemoCacheIdb();
+      if (!db) return;
+      try {
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        const store = tx.objectStore(IDB_STORE);
+        store.put(demo, key);
+        if (demo.demo_name && demo.demo_name !== key) {
+          store.put(demo, demo.demo_name);
+        }
+      } catch (_) {}
+    }
+
+    // 3г. Сохранение и восстановление состояния для каждой демки (выбранный игрок, фильтры, отмеченные моменты)
+    function loadAllDemoUiStates() {
+      try {
+        const raw = localStorage.getItem(DEMO_UI_STATE_KEY);
+        return raw ? (JSON.parse(raw) || {}) : {};
+      } catch (_) {
+        return {};
+      }
+    }
+
+    const demoUiStates = loadAllDemoUiStates();
+
+    function saveCurrentDemoUiState() {
+      if (!state.demo || !state.activeSteamId) return;
+      const dKey = getDemoCacheKey(state.demo);
+      if (!dKey) return;
+      if (!demoUiStates[dKey]) demoUiStates[dKey] = { byPlayer: {} };
+      demoUiStates[dKey].activeSteamId = state.activeSteamId;
+      demoUiStates[dKey].activeTab = state.activeTab;
+      demoUiStates[dKey].filterRound = document.getElementById('filter-round')?.value || 'all';
+      demoUiStates[dKey].filterWeapon = document.getElementById('filter-weapon')?.value || 'all';
+      if (!demoUiStates[dKey].byPlayer) demoUiStates[dKey].byPlayer = {};
+      demoUiStates[dKey].byPlayer[state.activeSteamId] = {
+        selectedKills: JSON.parse(JSON.stringify(state.selectedKills)),
+        selectedDeaths: JSON.parse(JSON.stringify(state.selectedDeaths)),
+        customClipOrder: state.customClipOrder ? [...state.customClipOrder] : null,
+      };
+      try {
+        localStorage.setItem(DEMO_UI_STATE_KEY, JSON.stringify(demoUiStates));
+      } catch (_) {}
+    }
+
+    const state = {
+      config: {},
+      demo: null,
+      activeSteamId: null,
+      activeTab: 'kills',
+      selectedKills: {},
+      selectedDeaths: {},
+      clipQueue: [],
+      customClipOrder: null,
+      focusedEventId: null,
+      focusedEventType: 'kill',
+      pollTimer: null,
+      lastLogCount: 0,
+      dragSrcIndex: null,
+    };
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      preloadAgentAssetsOnce();
+      setupDragAndDrop();
+      setupKeyboardShortcuts();
+      renderRecentDemosRibbon();
+      await fetchStatus();
+      await fetchCurrentDemoIfLoaded();
+    });
+
+    // Подстройка цвета фоновых пятен под карту
+    function applyMapAmbientTheme(mapName) {
+      const clean = String(mapName || 'de_mirage').toLowerCase().trim();
+      const theme = MAP_THEMES[clean] || MAP_THEMES.de_mirage;
+      document.documentElement.style.setProperty('--ambient-1', theme.a1);
+      document.documentElement.style.setProperty('--ambient-2', theme.a2);
+      document.documentElement.style.setProperty('--ambient-3', theme.a3);
+    }
+
+    // Работа с историей демок в localStorage (до 12 демок, ФИКСИРОВАННЫЙ порядок по дате первой загрузки)
+    function getStoredRecentDemos() {
+      try {
+        const raw = localStorage.getItem(RECENT_STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function computeDemoScoreInfo(demo) {
+      const roundsCount = demo.rounds_count || 20;
+      const half1 = Math.min(12, Math.round(roundsCount * 0.62));
+      const half2 = Math.max(0, roundsCount - half1);
+      const hi = Math.max(half1, half2);
+      const lo = Math.min(half1, half2);
+      const p0 = (demo.players && demo.players[0]) || { kills_count: 15, deaths_count: 12 };
+      const isWin = (p0.kills_count || 0) >= (p0.deaths_count || 0);
+      const scoreStr = isWin ? `${hi}:${lo}` : `${lo}:${hi}`;
+      return { score_str: scoreStr, result: isWin ? 'win' : 'loss' };
+    }
+
+    function saveDemoToRecentHistory(demo) {
+      if (!demo || !demo.demo_name) return;
+      const list = getStoredRecentDemos();
+      const existingIdx = list.findIndex(x => (x.demo_path && x.demo_path === demo.demo_path) || x.demo_name === demo.demo_name);
+      const scoreMeta = computeDemoScoreInfo(demo);
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('ru-RU');
+
+      if (existingIdx >= 0) {
+        // Обновляем на месте — порядок карточек НЕ меняется при клике/переключении!
+        const prev = list[existingIdx];
+        list[existingIdx] = {
+          ...prev,
+          demo_name: demo.demo_name,
+          demo_path: demo.demo_path || prev.demo_path || '',
+          map_name: demo.map_name || prev.map_name || 'de_mirage',
+          rounds_count: demo.rounds_count || prev.rounds_count || 0,
+          duration_seconds: demo.duration_seconds || prev.duration_seconds || 0,
+          tickrate: demo.tickrate || prev.tickrate || 64,
+          score_str: prev.score_str || scoreMeta.score_str,
+          result: prev.result || scoreMeta.result,
+          date_str: prev.date_str || dateStr,
+          first_loaded_at: prev.first_loaded_at || now.getTime(),
+          rendered_clips: prev.rendered_clips || 0,
+        };
+      } else {
+        // Новая демка добавляется в конец (фиксированный порядок по дате первой загрузки)
+        list.push({
+          demo_name: demo.demo_name,
+          demo_path: demo.demo_path || '',
+          map_name: demo.map_name || 'de_mirage',
+          rounds_count: demo.rounds_count || 0,
+          duration_seconds: demo.duration_seconds || 0,
+          tickrate: demo.tickrate || 64,
+          score_str: scoreMeta.score_str,
+          result: scoreMeta.result,
+          date_str: dateStr,
+          first_loaded_at: now.getTime(),
+          rendered_clips: 0,
+        });
+      }
+
+      const trimmed = list.length > 12 ? list.slice(list.length - 12) : list;
+      try {
+        localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(trimmed));
+      } catch (_) {}
+      renderRecentDemosRibbon();
+    }
+
+    function removeDemoFromHistory(item, ev) {
+      if (ev) ev.stopPropagation();
+      const list = getStoredRecentDemos();
+      const next = list.filter(x => !((item.demo_path && x.demo_path === item.demo_path) || x.demo_name === item.demo_name));
+      try {
+        localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(next));
+      } catch (_) {}
+      renderRecentDemosRibbon();
+    }
+
+    function incrementRecentDemoRenderedClips(countAdded) {
+      if (!state.demo) return;
+      const list = getStoredRecentDemos();
+      const item = list.find(x => (x.demo_path && x.demo_path === state.demo.demo_path) || x.demo_name === state.demo.demo_name);
+      if (item) {
+        item.rendered_clips = (item.rendered_clips || 0) + (countAdded || 1);
+        try {
+          localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(list));
+        } catch (_) {}
+        renderRecentDemosRibbon();
+      }
+    }
+
+    function renderRecentDemosRibbon() {
+      const track = document.getElementById('recent-demos-track');
+      const floatingPop = document.getElementById('recent-demo-floating-popover');
+      if (!track) return;
+      track.innerHTML = '';
+      if (floatingPop) floatingPop.classList.remove('visible');
+
+      const stored = getStoredRecentDemos().filter(d => d && (d.demo_name || d.demo_path));
+      if (stored.length === 0) {
+        track.innerHTML = '<div class="recent-demos-empty">Загрузите первую демку</div>';
+        return;
+      }
+
+      const visibleCards = stored.slice(0, 12);
+      visibleCards.forEach((item) => {
+        const mapClean = sanitizeMapName(item.map_name);
+        ensureMapAssetsChecked(mapClean);
+        const theme = MAP_THEMES[mapClean] || MAP_THEMES.de_mirage;
+        const isCurrent = state.demo && (
+          (item.demo_path && item.demo_path === state.demo.demo_path) ||
+          (item.demo_name && item.demo_name === state.demo.demo_name)
+        );
+        const clipsCount = Number(item.rendered_clips || 0);
+        const clipsText = pluralizeClips(clipsCount);
+
+        const wrap = document.createElement('div');
+        wrap.className = 'recent-demo-card-wrap';
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `recent-demo-card ${isCurrent ? 'active-demo' : ''}`;
+        const localJpgUrl = getMapThumbUrl(mapClean);
+        const murkyJpgUrl = getMurkyMapThumbUrl(mapClean);
+        const localIconUrl = getMapIconUrl(mapClean);
+        const murkyIconUrl = getMurkyMapIconUrl(mapClean);
+
+        btn.style.background = theme.grad;
+        btn.setAttribute('aria-label', `${mapClean} (${item.score_str || ''})`);
+        btn.onclick = () => onRecentDemoCardClick(item);
+
+        btn.innerHTML = `
+          <img class="recent-demo-bg" src="/static/maps/${encodeURIComponent(mapClean)}.jpg" onerror="if(this.src.indexOf('.png')===-1){this.src='/static/maps/${encodeURIComponent(mapClean)}.png';}else if(this.src.indexOf('githubusercontent')===-1){this.src='${murkyJpgUrl}';}else{this.style.display='none';}" alt="${escapeHtml(mapClean)}" />
+          <div class="recent-demo-result-bar ${item.result === 'loss' ? 'loss' : 'win'}"></div>
+          <img class="recent-demo-map-icon" src="/static/maps/icons/${encodeURIComponent(mapClean)}.png" alt="" onerror="if(this.src.indexOf('githubusercontent')===-1){this.src='${murkyIconUrl}';}else{this.style.display='none';}" />
+        `;
+
+        const rmBtn = document.createElement('button');
+        rmBtn.type = 'button';
+        rmBtn.className = 'recent-demo-remove-btn';
+        rmBtn.title = 'Убрать из истории';
+        rmBtn.setAttribute('aria-label', 'Убрать из истории');
+        rmBtn.textContent = '×';
+        rmBtn.onclick = (ev) => removeDemoFromHistory(item, ev);
+
+        wrap.addEventListener('mouseenter', () => {
+          if (!floatingPop) return;
+          floatingPop.innerHTML = `
+            <div class="popover-row"><span>Карта</span><strong>${escapeHtml(mapClean)}</strong></div>
+            <div class="popover-row"><span>Счёт</span><strong>${escapeHtml(item.score_str || '13:9')}</strong></div>
+            <div class="popover-row"><span>Дата</span><strong>${escapeHtml(item.date_str || '—')}</strong></div>
+            <div class="popover-row"><span>Раундов</span><strong>${item.rounds_count || 20}</strong></div>
+            <div class="popover-row"><span>Отрендерено</span><strong>${escapeHtml(clipsText)}</strong></div>
+          `;
+          const secRect = document.getElementById('recent-demos-section').getBoundingClientRect();
+          const wrapRect = wrap.getBoundingClientRect();
+          const leftPx = Math.max(0, Math.min(wrapRect.left - secRect.left, secRect.width - 220));
+          floatingPop.style.left = `${leftPx}px`;
+          floatingPop.classList.add('visible');
+        });
+        wrap.addEventListener('mouseleave', () => {
+          if (floatingPop) floatingPop.classList.remove('visible');
+        });
+
+        wrap.appendChild(btn);
+        wrap.appendChild(rmBtn);
+        track.appendChild(wrap);
+      });
+    }
+
+    async function onRecentDemoCardClick(item) {
+      const key = getDemoCacheKey(item);
+      // Проверяем Map в памяти и IndexedDB — переключение мгновенное без спиннера/скелетона
+      const cached = await getCachedDemo(key) || (item.demo_name ? await getCachedDemo(item.demo_name) : null);
+      if (cached && cached.players) {
+        onDemoLoaded(cached);
+        // Фоновая синхронизация активной демки на бэкенде (на бэкенде тоже сработает дисковый кеш cache/)
+        if (item.demo_path) {
+          fetch('/api/demo/load-path', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: item.demo_path }),
+          }).catch(() => {});
+        }
+        return;
+      }
+
+      if (item.demo_path) {
+        document.getElementById('demo-path-input').value = item.demo_path;
+        await parseByLocalPath();
+      } else if (state.demo) {
+        applyMapAmbientTheme(item.map_name);
+      } else {
+        togglePathPopover();
+      }
+    }
+
+    async function fetchCurrentDemoIfLoaded() {
+      try {
+        const res = await fetch('/api/demo/current');
+        const data = await res.json();
+        if (data.loaded && data.demo && data.demo.players) {
+          onDemoLoaded(data.demo);
+        }
+      } catch (_) {}
+    }
+
+    async function fetchStatus() {
+      try {
+        const res = await fetch('/api/env');
+        const data = await res.json();
+        if (data.config) {
+          state.config = data.config || {};
+          populateSettingsForm(state.config);
+        }
+      } catch (e) {
+        console.error('Status error:', e);
+      }
+    }
+
+    function populateSettingsForm(cfg) {
+      document.getElementById('cfg-cs2-path').value = cfg.cs2_path || '';
+      document.getElementById('cfg-hlae-path').value = cfg.hlae_path || '';
+      document.getElementById('cfg-ffmpeg-path').value = cfg.ffmpeg_path || '';
+      document.getElementById('cfg-backend').value = cfg.recording_backend || 'auto';
+      document.getElementById('cfg-output-dir').value = cfg.output_dir || '';
+
+      const outNameInput = document.getElementById('opt-output-name');
+      if (outNameInput) {
+        outNameInput.value = '';
+      }
+
+      if (cfg.encoder) document.getElementById('opt-encoder').value = cfg.encoder;
+      if (cfg.fps) document.getElementById('opt-fps').value = String(cfg.fps);
+      if (cfg.crf) document.getElementById('opt-crf').value = cfg.crf;
+      if (cfg.bitrate) document.getElementById('opt-bitrate').value = cfg.bitrate;
+      if (cfg.kill_pre_seconds !== undefined) document.getElementById('opt-kill-pre').value = cfg.kill_pre_seconds;
+      if (cfg.kill_post_seconds !== undefined) document.getElementById('opt-kill-post').value = cfg.kill_post_seconds;
+      if (cfg.kill_merge_gap_seconds !== undefined) document.getElementById('opt-merge-gap').value = cfg.kill_merge_gap_seconds;
+      if (cfg.death_pre_seconds !== undefined) document.getElementById('opt-death-pre').value = cfg.death_pre_seconds;
+      if (cfg.death_post_seconds !== undefined) document.getElementById('opt-death-post').value = cfg.death_post_seconds;
+      updateQuickRenderSub();
+    }
+
+    function setupDragAndDrop() {
+      const dz = document.getElementById('dropzone');
+      window.addEventListener('dragover', (e) => {
+        if (state.dragSrcIndex !== null) return;
+        e.preventDefault();
+        dz.classList.add('dragover');
+      });
+      window.addEventListener('dragleave', (e) => {
+        if (!e.relatedTarget) dz.classList.remove('dragover');
+      });
+      window.addEventListener('drop', (e) => {
+        if (state.dragSrcIndex !== null) return;
+        e.preventDefault();
+        dz.classList.remove('dragover');
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          uploadDemoFile(e.dataTransfer.files[0]);
+        }
+      });
+    }
+
+    function setupKeyboardShortcuts() {
+      window.addEventListener('keydown', (e) => {
+        const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+        const isInput = tag === 'input' || tag === 'textarea' || tag === 'select';
+
+        if (e.key === 'Escape') {
+          closePathPopover();
+          const modal = document.getElementById('settings-modal');
+          if (modal && modal.classList.contains('open')) {
+            closeSettingsModal();
+            return;
+          }
+          if (!isInput && state.demo) {
+            clearAllSelections();
+          }
+          return;
+        }
+
+        if (isInput) return;
+
+        if (e.code === 'Space' && state.demo && state.focusedEventId) {
+          e.preventDefault();
+          if (state.focusedEventType === 'kill' && state.selectedKills[state.focusedEventId]) {
+            const nextVal = !state.selectedKills[state.focusedEventId].selected;
+            onKillToggle(state.focusedEventId, nextVal);
+          } else if (state.focusedEventType === 'death' && state.selectedDeaths[state.focusedEventId]) {
+            const nextVal = !state.selectedDeaths[state.focusedEventId].selected;
+            onDeathToggle(state.focusedEventId, nextVal);
+          }
+        } else if (e.key === 'Enter' && state.demo) {
+          const btn = document.getElementById('btn-start-render');
+          if (btn && !btn.disabled) {
+            e.preventDefault();
+            startRenderJob();
+          }
+        }
+      });
+    }
+
+    async function uploadDemoFile(file) {
+      const low = file.name.toLowerCase();
+      if (!low.endsWith('.dem') && !low.endsWith('.bz2') && !low.endsWith('.gz') && !low.endsWith('.zip')) {
+        alert('Пожалуйста, выберите файл демки (.dem) или архив (.dem.bz2, .dem.gz, .zip)');
+        return;
+      }
+      const cached = await getCachedDemo(file.name);
+      setLoadingDemo(true, low.endsWith('.dem') ? 'Парсинг демки...' : 'Распаковка и парсинг архива демки...', !cached);
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch('/api/demo/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok || !data.players) {
+          throw new Error(data.detail || 'Ошибка парсинга демки');
+        }
+        onDemoLoaded(data);
+      } catch (err) {
+        alert('Ошибка при загрузке демки: ' + err.message);
+      } finally {
+        setLoadingDemo(false);
+      }
+    }
+
+    async function parseByLocalPath() {
+      const pathVal = document.getElementById('demo-path-input').value.trim();
+      if (!pathVal) return;
+
+      // Если данные уже есть в клиентском кеше — переключаемся мгновенно без ожидания сервера
+      const cached = await getCachedDemo(pathVal);
+      if (cached && cached.players) {
+        onDemoLoaded(cached);
+        fetch('/api/demo/load-path', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: pathVal }),
+        }).catch(() => {});
+        return;
+      }
+
+      const low = pathVal.toLowerCase();
+      const isShareCode = low.startsWith('steam://') || low.includes('csgo-');
+      const isUrl = isShareCode || low.startsWith('http://') || low.startsWith('https://');
+      const isCsstats = low.includes('csstats.gg');
+      setLoadingDemo(
+        true,
+        isShareCode
+          ? 'Расшифровка кода матча CS2 и скачивание демки с серверов Valve (~15–30 сек)...'
+          : isCsstats
+            ? 'Получение демки с csstats.gg (~15–40 сек)...'
+            : (isUrl ? 'Скачивание и распаковка демки по ссылке (~100 МБ)...' : 'Парсинг демки...'),
+        true
+      );
+      if (isUrl) {
+        appendLog('info', `Загрузка демки по ссылке/коду: ${pathVal}`);
+      }
+      try {
+        const res = await fetch('/api/demo/load-path', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: pathVal }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.players) {
+          throw new Error(data.detail || 'Не удалось загрузить или прочитать файл демки');
+        }
+        onDemoLoaded(data);
+      } catch (err) {
+        alert('Ошибка: ' + err.message);
+      } finally {
+        setLoadingDemo(false);
+      }
+    }
+
+    function setLoadingDemo(isLoading, labelText, showSkeleton = true) {
+      const txtEl = document.getElementById('parse-loading-text');
+      if (txtEl && labelText) txtEl.textContent = labelText;
+      document.getElementById('parse-loading').classList.toggle('hidden', !isLoading);
+      const skel = document.getElementById('skeleton-loader');
+      if (skel) skel.classList.toggle('hidden', !(isLoading && showSkeleton));
+    }
+
+    function onDemoLoaded(demo) {
+      // Сохраняем состояние предыдущей демки перед переключением
+      if (state.demo && state.activeSteamId) {
+        saveCurrentDemoUiState();
+      }
+
+      state.demo = demo;
+      setCachedDemo(demo);
+
+      const mapClean = sanitizeMapName(demo.map_name);
+      ensureMapAssetsChecked(mapClean);
+      applyMapAmbientTheme(mapClean);
+      saveDemoToRecentHistory(demo);
+
+      const summaryEl = document.getElementById('demo-summary');
+      const fullTooltip = demo.demo_path ? `${demo.demo_name} (${demo.demo_path})` : demo.demo_name;
+      document.getElementById('demo-empty-hint').classList.add('hidden');
+      summaryEl.classList.remove('hidden');
+      summaryEl.title = fullTooltip;
+
+      const nameEl = document.getElementById('meta-demo-name');
+      nameEl.textContent = demo.demo_name;
+      nameEl.title = fullTooltip;
+
+      const mapEl = document.getElementById('meta-map');
+      const localIconUrl = getMapIconUrl(mapClean);
+      const murkyIconUrl = getMurkyMapIconUrl(mapClean);
+      const iconSrc = assetStatusCache.get(localIconUrl) === 'missing' ? murkyIconUrl : localIconUrl;
+      mapEl.title = fullTooltip;
+      mapEl.innerHTML = `<img src="${iconSrc}" alt="" style="width:15px;height:15px;object-fit:contain;" onerror="if(this.src.indexOf('githubusercontent')===-1){this.src='${murkyIconUrl}';}else{this.style.display='none';}" /><span>${escapeHtml(mapClean)}</span>`;
+
+      document.getElementById('meta-rounds').textContent = `${demo.rounds_count} раундов`;
+      const mins = Math.floor((demo.duration_seconds || 0) / 60);
+      const secs = Math.round((demo.duration_seconds || 0) % 60);
+      document.getElementById('meta-duration').textContent = `${mins}м ${secs}с`;
+
+      const emptyState = document.getElementById('empty-workspace-state');
+      if (emptyState) emptyState.classList.add('hidden');
+      document.getElementById('players-section').classList.remove('hidden');
+      document.getElementById('moments-section').classList.remove('hidden');
+
+      // Восстанавливаем сохранённое состояние для этой демки (выбранного игрока, вкладку, фильтры и галочки)
+      const dKey = getDemoCacheKey(demo);
+      const savedDemoState = demoUiStates[dKey] || null;
+      if (savedDemoState && savedDemoState.activeTab) {
+        switchTab(savedDemoState.activeTab, false);
+      }
+
+      const validSavedPlayer = savedDemoState?.activeSteamId && demo.players?.some(p => p.steamid === savedDemoState.activeSteamId)
+        ? savedDemoState.activeSteamId
+        : (demo.players && demo.players[0] ? demo.players[0].steamid : null);
+
+      renderPlayersGrid();
+      if (validSavedPlayer) {
+        selectPlayer(validSavedPlayer, true);
+      }
+    }
+
+    // SVG-силуэт агента (fallback, если PNG из /static/agents/ недоступен)
+    function buildAgentSilhouetteSvg(team) {
+      const fill = team === 'CT' ? '#5d79ae' : '#d4a548';
+      return `
+        <div class="player-agent-silhouette-wrap">
+          <svg class="player-agent-silhouette" viewBox="0 0 100 175" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="50" cy="28" r="19" fill="${fill}" />
+            <path d="M16 76C16 56 31 47 50 47C69 47 84 56 84 76V170C84 173 81 175 77 175H23C19 175 16 173 16 170V76Z" fill="${fill}" />
+          </svg>
+        </div>
+      `;
+    }
+
+    // 4. КАРТОЧКИ ИГРОКОВ НА ВСЮ ШИРИНУ (5 CT · VS · 5 T)
+    function renderPlayersGrid() {
+      const grid = document.getElementById('players-grid');
+      if (!grid || !state.demo || !state.demo.players) return;
+
+      // Если карточки этой демки уже отрисованы — обновляем только класс .active без пересоздания DOM и мигания картинок
+      const renderedKey = grid.dataset.demoKey || '';
+      const currentKey = getDemoCacheKey(state.demo);
+      if (renderedKey === currentKey && grid.querySelectorAll('.player-card').length > 0) {
+        grid.querySelectorAll('.player-card').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.steamid === state.activeSteamId);
+        });
+        return;
+      }
+
+      grid.innerHTML = '';
+      grid.dataset.demoKey = currentKey;
+
+      const allPlayers = state.demo.players;
+      let ctPlayers = allPlayers.filter(p => p.team === 'CT');
+      let tPlayers = allPlayers.filter(p => p.team === 'T');
+      const others = allPlayers.filter(p => p.team !== 'CT' && p.team !== 'T');
+      for (const o of others) {
+        if (ctPlayers.length < 5) ctPlayers.push(o);
+        else tPlayers.push(o);
+      }
+      if (ctPlayers.length === 0 && tPlayers.length === 0) {
+        ctPlayers = allPlayers.slice(0, 5);
+        tPlayers = allPlayers.slice(5, 10);
+      }
+
+      const ctSide = document.createElement('div');
+      ctSide.className = 'roster-side';
+      ctPlayers.slice(0, 5).forEach((p, idx) => {
+        ctSide.appendChild(createAgentPlayerCard(p, 'CT', idx + 1));
+      });
+
+      const vsNode = document.createElement('div');
+      vsNode.className = 'roster-vs';
+      vsNode.textContent = 'VS';
+
+      const tSide = document.createElement('div');
+      tSide.className = 'roster-side';
+      tPlayers.slice(0, 5).forEach((p, idx) => {
+        tSide.appendChild(createAgentPlayerCard(p, 'T', idx + 1));
+      });
+
+      grid.appendChild(ctSide);
+      grid.appendChild(vsNode);
+      grid.appendChild(tSide);
+    }
+
+    function createAgentPlayerCard(p, sideTeam, idxInTeam) {
+      const isSelected = p.steamid === state.activeSteamId;
+      const team = (p.team === 'CT' || p.team === 'T') ? p.team : sideTeam;
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = `player-card ${team === 'CT' ? 'team-ct' : 'team-t'} ${isSelected ? 'active' : ''}`;
+      card.dataset.steamid = p.steamid;
+
+      const defaultAgentSrc = `/static/agents/default_${team === 'CT' ? 'ct' : 't'}.png`;
+      const agentSrc = (p.has_custom_agent && p.agent_image) ? p.agent_image : (p.agent_image || defaultAgentSrc);
+
+      const customTitle = (p.has_custom_agent && p.agent_name) ? ` · ${p.agent_name}` : '';
+      card.title = `${p.name}${customTitle} (${p.kills_count}/${p.deaths_count} · ${p.hs_count} HS)`;
+      card.onclick = () => selectPlayer(p.steamid);
+
+      const primaryMissing = assetStatusCache.get(agentSrc) === 'missing';
+      const defaultMissing = assetStatusCache.get(defaultAgentSrc) === 'missing';
+      const initialSrc = primaryMissing ? defaultAgentSrc : agentSrc;
+      const showImg = !(primaryMissing && defaultMissing);
+
+      card.innerHTML = `
+        <div class="player-agent-wrap">
+          <img class="player-agent-img" style="${showImg ? '' : 'display:none;'}" src="${escapeHtml(initialSrc)}" alt="${escapeHtml(p.name)}"
+            onerror="if(this.src.indexOf('default_')===-1 && assetStatusCache.get('${defaultAgentSrc}')!=='missing'){this.src='${defaultAgentSrc}';}else{this.style.display='none';this.nextElementSibling.style.display='flex';}" />
+          <div style="${showImg ? 'display:none;' : 'display:flex;'} width:100%; height:100%; align-items:flex-end; justify-content:center;">${buildAgentSilhouetteSvg(team)}</div>
+        </div>
+        ${p.has_custom_agent ? `<div class="player-custom-agent-badge" title="${escapeHtml(p.agent_name || 'Скин агента')}">★ Скин</div>` : ''}
+        <div class="player-card-footer">
+          <span class="player-nick" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>
+          <div class="player-stats-line">
+            <span><strong style="color: var(--text-primary);">${p.kills_count}</strong>/${p.deaths_count}</span>
+            <span>·</span>
+            <span>${p.hs_count} HS</span>
+          </div>
+        </div>
+      `;
+      return card;
+    }
+
+    function updateDynamicOutputPlaceholder() {
+      const inp = document.getElementById('opt-output-name');
+      if (!inp) return;
+      const mapName = (state.demo && state.demo.map_name) ? state.demo.map_name : 'de_mirage';
+      const pInfo = (state.demo && state.demo.players) ? state.demo.players.find(p => p.steamid === state.activeSteamId) : null;
+      const rawNick = pInfo ? pInfo.name : 'Player';
+      const cleanNick = rawNick.replace(/[^a-zA-Z0-9а-яА-ЯёЁ_-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || 'Player';
+      const today = new Date().toISOString().slice(0, 10);
+      inp.placeholder = `CS2_${mapName}_${cleanNick}_${today}.mp4`;
+    }
+
+    function selectPlayer(steamid, restoreFilterValues = false) {
+      if (state.demo && state.activeSteamId && state.activeSteamId !== steamid) {
+        saveCurrentDemoUiState();
+      }
+      state.activeSteamId = steamid;
+      const pInfo = state.demo.players.find(p => p.steamid === steamid);
+      const moments = (state.demo.moments_by_player && state.demo.moments_by_player[steamid]) || { kills: [], deaths: [], groups: [] };
+
+      const dKey = getDemoCacheKey(state.demo);
+      const savedDemoState = demoUiStates[dKey] || null;
+      const savedPlayerState = savedDemoState?.byPlayer?.[steamid] || null;
+
+      const defKillPre = parseFloat(document.getElementById('opt-kill-pre').value) || 2.0;
+      const defKillPost = parseFloat(document.getElementById('opt-kill-post').value) || 2.0;
+      const defDeathPre = parseFloat(document.getElementById('opt-death-pre').value) || 4.0;
+      const defDeathPost = parseFloat(document.getElementById('opt-death-post').value) || 1.5;
+      const defVictimReplay = document.getElementById('opt-victim-replay').checked;
+
+      state.selectedKills = {};
+      for (const k of moments.kills) {
+        const prevK = savedPlayerState?.selectedKills?.[k.id];
+        state.selectedKills[k.id] = prevK ? { ...prevK } : {
+          selected: true,
+          pov_victim_replay: defVictimReplay,
+          pre_seconds: defKillPre,
+          post_seconds: defKillPost,
+        };
+      }
+
+      state.selectedDeaths = {};
+      for (const d of moments.deaths) {
+        const prevD = savedPlayerState?.selectedDeaths?.[d.id];
+        state.selectedDeaths[d.id] = prevD ? { ...prevD } : {
+          selected: false,
+          pov_killer: true,
+          pre_seconds: defDeathPre,
+          post_seconds: defDeathPost,
+        };
+      }
+
+      state.customClipOrder = savedPlayerState?.customClipOrder ? [...savedPlayerState.customClipOrder] : null;
+
+      const activeLabel = document.getElementById('active-player-label');
+      activeLabel.textContent = pInfo ? `${pInfo.name} (${pInfo.kills_count}K / ${pInfo.deaths_count}D)` : steamid;
+      activeLabel.title = pInfo ? (pInfo.has_custom_agent && pInfo.agent_name ? `${pInfo.name} · ${pInfo.agent_name}` : pInfo.name) : steamid;
+      document.getElementById('tab-kills-count').textContent = moments.kills.length;
+      document.getElementById('tab-deaths-count').textContent = moments.deaths.length;
+
+      updateDynamicOutputPlaceholder();
+      populateTableFilters(moments);
+      if (restoreFilterValues && savedDemoState) {
+        const rSel = document.getElementById('filter-round');
+        const wSel = document.getElementById('filter-weapon');
+        if (rSel && savedDemoState.filterRound && Array.from(rSel.options).some(o => o.value === savedDemoState.filterRound)) {
+          rSel.value = savedDemoState.filterRound;
+        }
+        if (wSel && savedDemoState.filterWeapon && Array.from(wSel.options).some(o => o.value === savedDemoState.filterWeapon)) {
+          wSel.value = savedDemoState.filterWeapon;
+        }
+      }
+      saveCurrentDemoUiState();
+      renderPlayersGrid();
+      renderGroupsBar(moments.groups || []);
+      renderRoundTimeline(moments);
+      refreshClipQueuePreview();
+    }
+
+    // 4. ТАЙМЛАЙН РАУНДОВ
+    function renderRoundTimeline(moments) {
+      const container = document.getElementById('round-timeline-cells');
+      if (!container || !state.demo) return;
+      container.innerHTML = '';
+
+      const pInfo = state.demo.players.find(p => p.steamid === state.activeSteamId);
+      const baseTeam = (pInfo && pInfo.team === 'CT') ? 'CT' : 'T';
+      const oppositeTeam = baseTeam === 'CT' ? 'T' : 'CT';
+
+      let maxRound = state.demo.rounds_count || 20;
+      for (const k of (moments.kills || [])) if (k.round > maxRound) maxRound = k.round;
+      for (const d of (moments.deaths || [])) if (d.round > maxRound) maxRound = d.round;
+
+      const killsByRound = {};
+      const deathsByRound = {};
+      for (const k of (moments.kills || [])) {
+        if (!killsByRound[k.round]) killsByRound[k.round] = [];
+        killsByRound[k.round].push(k);
+      }
+      for (const d of (moments.deaths || [])) {
+        if (!deathsByRound[d.round]) deathsByRound[d.round] = [];
+        deathsByRound[d.round].push(d);
+      }
+
+      const badgeByRound = {};
+      for (const g of (moments.groups || [])) {
+        const label = g.badge || g.subtype || (g.type === 'clutch' ? 'CLUTCH' : '');
+        if (g.type === 'clutch') {
+          badgeByRound[g.round] = label || 'CLUTCH';
+        } else if (!badgeByRound[g.round] && label) {
+          badgeByRound[g.round] = label;
+        }
+      }
+
+      for (let r = 1; r <= maxRound; r++) {
+        if (r === 13) {
+          const sep = document.createElement('div');
+          sep.className = 'timeline-half-sep';
+          sep.title = 'Смена сторон (2-я половина)';
+          sep.textContent = 'HALF';
+          container.appendChild(sep);
+        } else if (r === 25) {
+          const sep = document.createElement('div');
+          sep.className = 'timeline-half-sep';
+          sep.title = 'Овертайм';
+          sep.textContent = 'OT';
+          container.appendChild(sep);
+        }
+
+        const rKills = killsByRound[r] || [];
+        const rDeaths = deathsByRound[r] || [];
+
+        // Определяем сторону игрока в этом раунде по событию или по половине матча
+        let roundSide = r <= 12 ? baseTeam : oppositeTeam;
+        if (r > 24) {
+          const otCycle = Math.floor((r - 25) / 3) % 2;
+          roundSide = otCycle === 0 ? baseTeam : oppositeTeam;
+        }
+        if (rKills.length > 0 && (rKills[0].attacker_team === 'CT' || rKills[0].attacker_team === 'T')) {
+          roundSide = rKills[0].attacker_team;
+        } else if (rDeaths.length > 0 && (rDeaths[0].victim_team === 'CT' || rDeaths[0].victim_team === 'T')) {
+          roundSide = rDeaths[0].victim_team;
+        }
+
+        const teamIcon = roundSide === 'CT' ? '/static/icons/ct_logo.svg' : '/static/icons/t_logo.svg';
+        const teamTitle = roundSide === 'CT' ? 'Спецназ (CT)' : 'Террористы (T)';
+
+        const hasSelectedKills = rKills.length > 0 && rKills.every(k => state.selectedKills[k.id]?.selected);
+        const topBadge = badgeByRound[r] || (rKills.length >= 5 ? 'ACE' : (rKills.length >= 2 ? `${rKills.length}K` : ''));
+
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = `round-cell ${roundSide === 'CT' ? 'side-ct' : 'side-t'} ${hasSelectedKills ? 'selected' : ''}`;
+        cell.onclick = () => toggleRoundKills(r);
+
+        // Тултип со временем киллов и жертвами
+        const tooltipParts = [`Раунд ${r} (${roundSide})`];
+        if (rKills.length > 0) {
+          tooltipParts.push('Киллы: ' + rKills.map(k => `${k.time_in_round || ''} → ${k.victim_name} (${k.weapon})`).join(', '));
+        } else {
+          tooltipParts.push('Киллов нет');
+        }
+        if (rDeaths.length > 0) {
+          tooltipParts.push(`Смерть: ${rDeaths[0].time_in_round || ''} от ${rDeaths[0].attacker_name}`);
+        }
+        cell.title = tooltipParts.join(' | ');
+        cell.setAttribute('aria-label', cell.title);
+
+        let dotsHtml = '';
+        for (let i = 0; i < rKills.length; i++) {
+          dotsHtml += '<span class="kill-dot"></span>';
+        }
+
+        cell.innerHTML = `
+          ${topBadge ? `<span class="round-top-badge" title="Выбрать раунд ${r} (${escapeHtml(topBadge)})">${escapeHtml(topBadge)}</span>` : ''}
+          <img class="round-team-icon" src="${teamIcon}" alt="${roundSide}" title="${teamTitle}" />
+          <span class="round-cell-num">${r}</span>
+          <div class="round-cell-dots">${dotsHtml}</div>
+          ${rDeaths.length > 0 ? '<span class="death-bar-mark" title="Смерть в раунде"></span>' : '<span style="height:3px;"></span>'}
+        `;
+        container.appendChild(cell);
+      }
+    }
+
+    function toggleRoundKills(roundNum) {
+      if (!state.demo || !state.activeSteamId) return;
+      const moments = state.demo.moments_by_player[state.activeSteamId] || { kills: [], deaths: [], groups: [] };
+      const rKills = (moments.kills || []).filter(k => k.round === roundNum);
+      if (rKills.length === 0) return;
+
+      const allSelected = rKills.every(k => state.selectedKills[k.id]?.selected);
+      const nextState = !allSelected;
+      for (const k of rKills) {
+        if (state.selectedKills[k.id]) {
+          state.selectedKills[k.id].selected = nextState;
+        }
+      }
+      state.customClipOrder = null;
+      renderGroupsBar(moments.groups || []);
+      renderRoundTimeline(moments);
+      refreshClipQueuePreview();
+    }
+
+    function populateTableFilters(moments) {
+      const roundSel = document.getElementById('filter-round');
+      const weaponSel = document.getElementById('filter-weapon');
+      const rounds = new Set();
+      const weapons = new Set();
+
+      for (const k of moments.kills) {
+        rounds.add(k.round);
+        weapons.add(k.weapon);
+      }
+      for (const d of moments.deaths) {
+        rounds.add(d.round);
+        weapons.add(d.weapon);
+      }
+
+      roundSel.innerHTML = '<option value="all">Все раунды</option>';
+      Array.from(rounds).sort((a, b) => a - b).forEach(r => {
+        roundSel.innerHTML += `<option value="${r}">Раунд ${r}</option>`;
+      });
+
+      weaponSel.innerHTML = '<option value="all">Все оружия</option>';
+      Array.from(weapons).sort().forEach(w => {
+        weaponSel.innerHTML += `<option value="${escapeHtml(w)}">${escapeHtml(w)}</option>`;
+      });
+    }
+
+    function renderGroupsBar(groups) {
+      // Строка чипов «Хайлайты» скрыта (бейджи 2K/3K/4K/ACE отображаются над таймлайном раундов)
+      const bar = document.getElementById('groups-bar');
+      const container = document.getElementById('groups-container');
+      if (container) container.innerHTML = '';
+      if (bar) {
+        bar.classList.add('hidden');
+        bar.style.display = 'none';
+      }
+    }
+
+    function toggleHighlightGroup(group) {
+      const allSelected = group.kill_ids.every(id => state.selectedKills[id]?.selected);
+      const target = !allSelected;
+      for (const id of group.kill_ids) {
+        if (state.selectedKills[id]) {
+          state.selectedKills[id].selected = target;
+        }
+      }
+      state.customClipOrder = null;
+      const moments = state.demo.moments_by_player[state.activeSteamId];
+      renderGroupsBar(moments.groups || []);
+      renderRoundTimeline(moments);
+      refreshClipQueuePreview();
+    }
+
+    function switchTab(tab, persist = true) {
+      state.activeTab = tab;
+      document.getElementById('tab-kills').classList.toggle('active', tab === 'kills');
+      document.getElementById('tab-deaths').classList.toggle('active', tab === 'deaths');
+      document.getElementById('panel-kills').classList.toggle('hidden', tab !== 'kills');
+      document.getElementById('panel-deaths').classList.toggle('hidden', tab !== 'deaths');
+      if (persist) saveCurrentDemoUiState();
+    }
+
+    function onFilterChange() {
+      saveCurrentDemoUiState();
+      renderMomentsTables();
+    }
+
+    // 7. Иконки оружия: /static/icons/weapons/<weapon>.png (из Custom-CSGO-HUD).
+    function sanitizeWeaponName(weapon) {
+      if (!weapon) return 'unknown';
+      let w = String(weapon).toLowerCase().trim().replace(/^weapon_/, '');
+      const weaponMap = {
+        'usp': 'usp_silencer',
+        'p2000': 'hkp2000',
+        'zeus': 'taser',
+        'inferno': 'molotov',
+        'galil': 'galilar',
+        'scout': 'ssg08',
+        'dual_berettas': 'elite',
+        'cz75': 'cz75a',
+        'm4a4': 'm4a1',
+        'mp5': 'mp5sd',
+        'r8': 'revolver',
+      };
+      return weaponMap[w] || w;
+    }
+
+    function buildWeaponPillHtml(weapon) {
+      const w = sanitizeWeaponName(weapon);
+      const iconRel = `weapons/${w}.png`;
+      const fallbackUrl = `https://raw.githubusercontent.com/dionpirotta/Custom-CSGO-HUD/master/public/files/img/weapons/${encodeURIComponent(w)}.png`;
+
+      return `
+        <span class="weapon-pill" title="Оружие: ${escapeHtml(w)}">
+          <img src="/static/icons/weapons/${encodeURIComponent(w)}.png" alt="${escapeHtml(w)}"
+            onerror="if(this.src.indexOf('githubusercontent')===-1){this.src='${fallbackUrl}';}else{this.style.display='none';reportMissingIcon('${escapeHtml(iconRel)}', this, true);}" />
+          <span class="weapon-name-fallback" style="display: none;">${escapeHtml(w)}</span>
+        </span>
+      `;
+    }
+
+    function buildModifierIconsHtml(item, mergedClusterIdx) {
+      const icons = [];
+      if (item.headshot) icons.push(MOD_SVGS.hs);
+      if (item.wallbang) icons.push(MOD_SVGS.wallbang);
+      if (item.thrusmoke) icons.push(MOD_SVGS.smoke);
+      if (item.attackerblind) icons.push(MOD_SVGS.blind);
+      if (item.noscope) icons.push(MOD_SVGS.noscope);
+      if (item.airborne) icons.push(MOD_SVGS.airborne);
+      if (mergedClusterIdx !== undefined) icons.push(MOD_SVGS.merged(mergedClusterIdx));
+
+      if (icons.length === 0) {
+        return '';
+      }
+      return `<div class="mod-icons">${icons.join('')}</div>`;
+    }
+
+    function buildCameraEyeSvg(isKillerPov) {
+      if (isKillerPov) {
+        return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+      }
+      return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+    }
+
+    function renderMomentsTables() {
+      if (!state.demo || !state.activeSteamId) return;
+      const moments = state.demo.moments_by_player[state.activeSteamId] || { kills: [], deaths: [], groups: [] };
+      const roundFilter = document.getElementById('filter-round').value;
+      const weaponFilter = document.getElementById('filter-weapon').value;
+
+      const clusterMap = {};
+      state.clipQueue.filter(c => c.type === 'kill').forEach((clip) => {
+        if (clip.event_ids && clip.event_ids.length > 1) {
+          clip.event_ids.forEach(eid => {
+            clusterMap[eid] = clip.index;
+          });
+        }
+      });
+
+      // Render Kills
+      const killsTbody = document.getElementById('kills-tbody');
+      killsTbody.innerHTML = '';
+      const filteredKills = moments.kills.filter(k => {
+        if (roundFilter !== 'all' && String(k.round) !== roundFilter) return false;
+        if (weaponFilter !== 'all' && k.weapon !== weaponFilter) return false;
+        return true;
+      });
+
+      for (const k of filteredKills) {
+        const st = state.selectedKills[k.id] || { selected: false, pov_victim_replay: false, pre_seconds: 2.0, post_seconds: 2.0 };
+        const tr = document.createElement('tr');
+        if (st.selected) tr.classList.add('row-selected');
+        if (state.focusedEventId === k.id) tr.classList.add('row-focused');
+        tr.dataset.eventId = k.id;
+        tr.onmouseenter = () => { state.focusedEventId = k.id; state.focusedEventType = 'kill'; };
+
+        const modHtml = buildModifierIconsHtml(k, clusterMap[k.id]);
+
+        tr.innerHTML = `
+          <td style="text-align: center;">
+            <input type="checkbox" ${st.selected ? 'checked' : ''} onchange="onKillToggle('${k.id}', this.checked)" class="cb" aria-label="Выбрать килл раунд ${k.round}" />
+          </td>
+          <td class="condensed" style="font-size: 16px; font-weight: 700; text-align: center; color: var(--text-primary);">${k.round}</td>
+          <td>
+            <div class="weapon-cell">
+              ${buildWeaponPillHtml(k.weapon)}
+              ${modHtml}
+            </div>
+          </td>
+          <td style="max-width: 280px;">
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+              <span style="color: var(--text-muted); font-size: 14px; flex-shrink: 0;">→</span>
+              <span class="badge ${k.victim_team === 'CT' ? 'badge-ct' : 'badge-t'}">${k.victim_team}</span>
+              <span class="nick-text" title="${escapeHtml(k.victim_name)}">${escapeHtml(k.victim_name)}</span>
+            </div>
+          </td>
+          <td>
+            <label style="display: inline-flex; align-items: center; gap: 7px; cursor: pointer; font-size: 13px;">
+              <input type="checkbox" ${st.pov_victim_replay ? 'checked' : ''} onchange="onKillVictimReplayToggle('${k.id}', this.checked)" class="cb" />
+              <span style="color: ${st.pov_victim_replay ? 'var(--text-primary)' : 'var(--text-muted)'}; font-weight: 500;">POV жертвы</span>
+            </label>
+          </td>
+          <td style="text-align: center;">
+            <div class="stepper">
+              <button type="button" class="stepper-btn" onclick="stepKillTiming('${k.id}', 'pre_seconds', -0.5)" title="Уменьшить ДО" aria-label="Уменьшить ДО">−</button>
+              <input type="number" step="0.5" min="0.5" max="15" value="${st.pre_seconds}"
+                onchange="onKillTimingChange('${k.id}', 'pre_seconds', this.value)"
+                class="input input-num mono" aria-label="Секунд ДО" />
+              <button type="button" class="stepper-btn" onclick="stepKillTiming('${k.id}', 'pre_seconds', 0.5)" title="Увеличить ДО" aria-label="Увеличить ДО">+</button>
+            </div>
+          </td>
+          <td style="text-align: center;">
+            <div class="stepper">
+              <button type="button" class="stepper-btn" onclick="stepKillTiming('${k.id}', 'post_seconds', -0.5)" title="Уменьшить ПОСЛЕ" aria-label="Уменьшить ПОСЛЕ">−</button>
+              <input type="number" step="0.5" min="0.5" max="15" value="${st.post_seconds}"
+                onchange="onKillTimingChange('${k.id}', 'post_seconds', this.value)"
+                class="input input-num mono" aria-label="Секунд ПОСЛЕ" />
+              <button type="button" class="stepper-btn" onclick="stepKillTiming('${k.id}', 'post_seconds', 0.5)" title="Увеличить ПОСЛЕ" aria-label="Увеличить ПОСЛЕ">+</button>
+            </div>
+          </td>
+        `;
+        killsTbody.appendChild(tr);
+      }
+
+      // Render Deaths (Колонка «Камера» — компактный переключатель-иконка глаза с tooltip)
+      const deathsTbody = document.getElementById('deaths-tbody');
+      deathsTbody.innerHTML = '';
+      const filteredDeaths = moments.deaths.filter(d => {
+        if (roundFilter !== 'all' && String(d.round) !== roundFilter) return false;
+        if (weaponFilter !== 'all' && d.weapon !== weaponFilter) return false;
+        return true;
+      });
+
+      for (const d of filteredDeaths) {
+        const st = state.selectedDeaths[d.id] || { selected: false, pov_killer: true, pre_seconds: 4.0, post_seconds: 1.5 };
+        const tr = document.createElement('tr');
+        if (st.selected) tr.classList.add('row-selected');
+        if (state.focusedEventId === d.id) tr.classList.add('row-focused');
+        tr.dataset.eventId = d.id;
+        tr.onmouseenter = () => { state.focusedEventId = d.id; state.focusedEventType = 'death'; };
+
+        const camTitle = st.pov_killer
+          ? 'Камера: от лица убийцы (нажмите для вида от своего лица)'
+          : 'Камера: от своего лица (нажмите для вида от лица убийцы)';
+
+        const modHtml = buildModifierIconsHtml(d);
+
+        tr.innerHTML = `
+          <td style="text-align: center;">
+            <input type="checkbox" ${st.selected ? 'checked' : ''} onchange="onDeathToggle('${d.id}', this.checked)" class="cb" aria-label="Выбрать смерть раунд ${d.round}" />
+          </td>
+          <td class="condensed" style="font-size: 16px; font-weight: 700; text-align: center; color: var(--text-primary);">${d.round}</td>
+          <td style="max-width: 280px;">
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+              <span class="badge ${d.attacker_team === 'CT' ? 'badge-ct' : 'badge-t'}">${d.attacker_team}</span>
+              <span class="nick-text" title="${escapeHtml(d.attacker_name)}">${escapeHtml(d.attacker_name)}</span>
+            </div>
+          </td>
+          <td>
+            <div class="weapon-cell">
+              ${buildWeaponPillHtml(d.weapon)}
+              ${modHtml}
+            </div>
+          </td>
+          <td style="text-align: center;">
+            <button type="button" class="cam-eye-btn ${st.pov_killer ? 'active' : ''}" onclick="onDeathPovToggle('${d.id}', ${!st.pov_killer})" title="${camTitle}" aria-label="${camTitle}">
+              ${buildCameraEyeSvg(st.pov_killer)}
+            </button>
+          </td>
+          <td style="text-align: center;">
+            <div class="stepper">
+              <button type="button" class="stepper-btn" onclick="stepDeathTiming('${d.id}', 'pre_seconds', -0.5)" title="Уменьшить ДО" aria-label="Уменьшить ДО">−</button>
+              <input type="number" step="0.5" min="0.5" max="15" value="${st.pre_seconds}"
+                onchange="onDeathTimingChange('${d.id}', 'pre_seconds', this.value)"
+                class="input input-num mono" aria-label="Секунд ДО" />
+              <button type="button" class="stepper-btn" onclick="stepDeathTiming('${d.id}', 'pre_seconds', 0.5)" title="Увеличить ДО" aria-label="Увеличить ДО">+</button>
+            </div>
+          </td>
+          <td style="text-align: center;">
+            <div class="stepper">
+              <button type="button" class="stepper-btn" onclick="stepDeathTiming('${d.id}', 'post_seconds', -0.5)" title="Уменьшить ПОСЛЕ" aria-label="Уменьшить ПОСЛЕ">−</button>
+              <input type="number" step="0.5" min="0.5" max="15" value="${st.post_seconds}"
+                onchange="onDeathTimingChange('${d.id}', 'post_seconds', this.value)"
+                class="input input-num mono" aria-label="Секунд ПОСЛЕ" />
+              <button type="button" class="stepper-btn" onclick="stepDeathTiming('${d.id}', 'post_seconds', 0.5)" title="Увеличить ПОСЛЕ" aria-label="Увеличить ПОСЛЕ">+</button>
+            </div>
+          </td>
+        `;
+        deathsTbody.appendChild(tr);
+      }
+
+      const allK = moments.kills.length > 0 && moments.kills.every(k => state.selectedKills[k.id]?.selected);
+      const allV = moments.kills.length > 0 && moments.kills.every(k => state.selectedKills[k.id]?.pov_victim_replay);
+      const allD = moments.deaths.length > 0 && moments.deaths.every(d => state.selectedDeaths[d.id]?.selected);
+      const allDeathsPov = moments.deaths.length === 0 || moments.deaths.every(d => state.selectedDeaths[d.id]?.pov_killer);
+      document.getElementById('cb-all-kills').checked = allK;
+      document.getElementById('cb-all-victim-replays').checked = allV;
+      document.getElementById('opt-victim-replay').checked = allV;
+      document.getElementById('cb-all-deaths').checked = allD;
+      const allDeathPovBtn = document.getElementById('btn-all-deaths-pov');
+      if (allDeathPovBtn) {
+        allDeathPovBtn.classList.toggle('active', allDeathsPov);
+        allDeathPovBtn.innerHTML = buildCameraEyeSvg(allDeathsPov);
+      }
+    }
+
+    function toggleAllDeathsPov() {
+      const ids = Object.keys(state.selectedDeaths);
+      if (ids.length === 0) return;
+      const allPovKiller = ids.every(id => state.selectedDeaths[id]?.pov_killer);
+      const nextVal = !allPovKiller;
+      for (const id of ids) {
+        state.selectedDeaths[id].pov_killer = nextVal;
+      }
+      saveCurrentDemoUiState();
+      refreshClipQueuePreview();
+    }
+
+    function stepKillTiming(id, field, delta) {
+      if (!state.selectedKills[id]) return;
+      const cur = parseFloat(state.selectedKills[id][field]) || 2.0;
+      const next = Math.min(15.0, Math.max(0.5, Math.round((cur + delta) * 10) / 10));
+      state.selectedKills[id][field] = next;
+      saveCurrentDemoUiState();
+      refreshClipQueuePreview();
+    }
+
+    function stepDeathTiming(id, field, delta) {
+      if (!state.selectedDeaths[id]) return;
+      const cur = parseFloat(state.selectedDeaths[id][field]) || 2.0;
+      const next = Math.min(15.0, Math.max(0.5, Math.round((cur + delta) * 10) / 10));
+      state.selectedDeaths[id][field] = next;
+      saveCurrentDemoUiState();
+      refreshClipQueuePreview();
+    }
+
+    function stepGlobalInput(id, delta) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const min = parseFloat(el.min) || 0;
+      const max = parseFloat(el.max) || 30;
+      const cur = parseFloat(el.value) || 0;
+      const next = Math.max(min, Math.min(max, Math.round((cur + delta) * 10) / 10));
+      el.value = next.toFixed(1);
+      el.dispatchEvent(new Event('change'));
+    }
+
+    function onKillToggle(id, checked) {
+      if (state.selectedKills[id]) state.selectedKills[id].selected = checked;
+      state.customClipOrder = null;
+      saveCurrentDemoUiState();
+      const moments = state.demo.moments_by_player[state.activeSteamId];
+      renderGroupsBar(moments.groups || []);
+      renderRoundTimeline(moments);
+      refreshClipQueuePreview();
+    }
+
+    function onKillVictimReplayToggle(id, checked) {
+      if (state.selectedKills[id]) {
+        state.selectedKills[id].pov_victim_replay = checked;
+        saveCurrentDemoUiState();
+        refreshClipQueuePreview();
+      }
+    }
+
+    function toggleAllVictimReplays(checked) {
+      document.getElementById('opt-victim-replay').checked = checked;
+      document.getElementById('cb-all-victim-replays').checked = checked;
+      for (const id in state.selectedKills) {
+        state.selectedKills[id].pov_victim_replay = checked;
+      }
+      saveCurrentDemoUiState();
+      refreshClipQueuePreview();
+    }
+
+    function onKillTimingChange(id, field, val) {
+      const num = parseFloat(val);
+      if (state.selectedKills[id] && !isNaN(num)) {
+        state.selectedKills[id][field] = num;
+        saveCurrentDemoUiState();
+        refreshClipQueuePreview();
+      }
+    }
+
+    function onDeathToggle(id, checked) {
+      if (state.selectedDeaths[id]) state.selectedDeaths[id].selected = checked;
+      state.customClipOrder = null;
+      saveCurrentDemoUiState();
+      refreshClipQueuePreview();
+    }
+
+    function onDeathPovToggle(id, checked) {
+      if (state.selectedDeaths[id]) {
+        state.selectedDeaths[id].pov_killer = checked;
+        saveCurrentDemoUiState();
+        refreshClipQueuePreview();
+      }
+    }
+
+    function onDeathTimingChange(id, field, val) {
+      const num = parseFloat(val);
+      if (state.selectedDeaths[id] && !isNaN(num)) {
+        state.selectedDeaths[id][field] = num;
+        saveCurrentDemoUiState();
+        refreshClipQueuePreview();
+      }
+    }
+
+    function selectAllKills(checked) {
+      for (const id in state.selectedKills) state.selectedKills[id].selected = checked;
+      state.customClipOrder = null;
+      saveCurrentDemoUiState();
+      const moments = state.demo?.moments_by_player?.[state.activeSteamId];
+      if (moments) {
+        renderGroupsBar(moments.groups || []);
+        renderRoundTimeline(moments);
+      }
+      refreshClipQueuePreview();
+    }
+
+    function selectAllDeaths(checked) {
+      for (const id in state.selectedDeaths) state.selectedDeaths[id].selected = checked;
+      state.customClipOrder = null;
+      saveCurrentDemoUiState();
+      refreshClipQueuePreview();
+    }
+
+    function selectOnlyHighlights() {
+      if (!state.demo || !state.activeSteamId) return;
+      const moments = state.demo.moments_by_player[state.activeSteamId];
+      for (const id in state.selectedKills) state.selectedKills[id].selected = false;
+      for (const g of (moments.groups || [])) {
+        for (const kid of g.kill_ids) {
+          if (state.selectedKills[kid]) state.selectedKills[kid].selected = true;
+        }
+      }
+      state.customClipOrder = null;
+      saveCurrentDemoUiState();
+      renderGroupsBar(moments.groups || []);
+      renderRoundTimeline(moments);
+      refreshClipQueuePreview();
+    }
+
+    function clearAllSelections() {
+      selectAllKills(false);
+      selectAllDeaths(false);
+    }
+
+    function applyDefaultKillOffsets() {
+      const pre = parseFloat(document.getElementById('opt-kill-pre').value) || 2.0;
+      const post = parseFloat(document.getElementById('opt-kill-post').value) || 2.0;
+      for (const id in state.selectedKills) {
+        state.selectedKills[id].pre_seconds = pre;
+        state.selectedKills[id].post_seconds = post;
+      }
+      saveCurrentDemoUiState();
+      refreshClipQueuePreview();
+    }
+
+    function applyDefaultDeathOffsets() {
+      const pre = parseFloat(document.getElementById('opt-death-pre').value) || 4.0;
+      const post = parseFloat(document.getElementById('opt-death-post').value) || 1.5;
+      for (const id in state.selectedDeaths) {
+        state.selectedDeaths[id].pre_seconds = pre;
+        state.selectedDeaths[id].post_seconds = post;
+      }
+      saveCurrentDemoUiState();
+      refreshClipQueuePreview();
+    }
+
+    function onGlobalTimingChange() {
+      refreshClipQueuePreview();
+    }
+
+    // Быстрые пресеты видео
+    function applyVideoPreset(preset) {
+      document.getElementById('preset-yt')?.classList.toggle('active', preset === 'youtube');
+      document.getElementById('preset-tt')?.classList.toggle('active', preset === 'tiktok');
+      document.getElementById('preset-draft')?.classList.toggle('active', preset === 'draft');
+
+      if (preset === 'youtube') {
+        document.getElementById('opt-resolution').value = '1920x1080';
+        document.getElementById('opt-fps').value = '144';
+        document.getElementById('opt-crf').value = '18';
+        document.getElementById('opt-bitrate').value = '24M';
+      } else if (preset === 'tiktok') {
+        document.getElementById('opt-resolution').value = '1920x1080';
+        document.getElementById('opt-fps').value = '144';
+        document.getElementById('opt-crf').value = '20';
+        document.getElementById('opt-bitrate').value = '18M';
+      } else if (preset === 'draft') {
+        document.getElementById('opt-resolution').value = '1280x720';
+        document.getElementById('opt-fps').value = '144';
+        document.getElementById('opt-crf').value = '24';
+        document.getElementById('opt-bitrate').value = '10M';
+      }
+      updateQuickRenderSub();
+    }
+
+    function updateQuickRenderSub() {
+      const subEl = document.getElementById('render-quick-sub');
+      const clipsCount = state.clipQueue ? state.clipQueue.length : 0;
+      const rawDur = parseFloat(document.getElementById('summary-duration')?.textContent) || 0;
+      const roundedDur = Math.round(rawDur);
+      const btn = document.getElementById('btn-start-render');
+      if (btn) {
+        btn.textContent = clipsCount > 0
+          ? `Рендер MP4 · ${pluralizeClips(clipsCount)} · ${roundedDur} с`
+          : 'Рендер MP4';
+      }
+      if (!subEl) return;
+      const rawRes = document.getElementById('opt-resolution')?.value || '1920x1080';
+      const fps = document.getElementById('opt-fps')?.value || '144';
+      let resShort = '1080p';
+      if (rawRes.includes('2560')) resShort = '1440p';
+      else if (rawRes.includes('720')) resShort = '720p';
+      else if (rawRes.includes('1080x1920')) resShort = '9:16';
+      else if (rawRes.endsWith('_stretch')) resShort = '4:3→1080p';
+      subEl.textContent = `${pluralizeClips(clipsCount)} · ${roundedDur} с · ${resShort} ${fps} FPS`;
+    }
+
+    function buildSelectionPayload() {
+      const selected_kills = [];
+      for (const [id, cfg] of Object.entries(state.selectedKills)) {
+        if (cfg.selected) {
+          selected_kills.push({
+            id,
+            pov_victim_replay: Boolean(cfg.pov_victim_replay),
+            pre_seconds: cfg.pre_seconds,
+            post_seconds: cfg.post_seconds,
+          });
+        }
+      }
+      const selected_deaths = [];
+      for (const [id, cfg] of Object.entries(state.selectedDeaths)) {
+        if (cfg.selected) {
+          selected_deaths.push({
+            id,
+            pov_killer: cfg.pov_killer,
+            pre_seconds: cfg.pre_seconds,
+            post_seconds: cfg.post_seconds,
+          });
+        }
+      }
+      return {
+        demo_path: state.demo?.demo_path || null,
+        player_steamid: state.activeSteamId,
+        selected_kills,
+        selected_deaths,
+        merge_gap_seconds: parseFloat(document.getElementById('opt-merge-gap').value) || 5.0,
+        default_kill_pre: parseFloat(document.getElementById('opt-kill-pre').value) || 2.0,
+        default_kill_post: parseFloat(document.getElementById('opt-kill-post').value) || 2.0,
+        default_death_pre: parseFloat(document.getElementById('opt-death-pre').value) || 4.0,
+        default_death_post: parseFloat(document.getElementById('opt-death-post').value) || 1.5,
+        default_victim_replay: document.getElementById('opt-victim-replay').checked,
+      };
+    }
+
+    async function refreshClipQueuePreview() {
+      if (!state.demo || !state.activeSteamId) return;
+      const payload = buildSelectionPayload();
+      try {
+        const res = await fetch('/api/queue/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (res.ok && data.queue) {
+          state.clipQueue = data.queue || [];
+          updateQueueSummaryUI(data.total_clips, data.total_duration_sec, payload.selected_kills.length, payload.selected_deaths.length);
+          renderMomentsTables();
+        }
+      } catch (e) {
+        console.error('Preview queue error:', e);
+      }
+    }
+
+    function removeClipFromQueue(clip) {
+      if (!clip) return;
+      if (clip.type === 'victim_replay' && clip.event_ids) {
+        for (const eid of clip.event_ids) {
+          if (state.selectedKills[eid]) state.selectedKills[eid].pov_victim_replay = false;
+        }
+      } else if (clip.type === 'kill' && clip.event_ids) {
+        for (const eid of clip.event_ids) {
+          if (state.selectedKills[eid]) state.selectedKills[eid].selected = false;
+        }
+      } else if (clip.type === 'death' && clip.event_ids) {
+        for (const eid of clip.event_ids) {
+          if (state.selectedDeaths[eid]) state.selectedDeaths[eid].selected = false;
+        }
+      }
+      saveCurrentDemoUiState();
+      const moments = state.demo?.moments_by_player?.[state.activeSteamId];
+      if (moments) {
+        renderGroupsBar(moments.groups || []);
+        renderRoundTimeline(moments);
+      }
+      refreshClipQueuePreview();
+    }
+
+    function updateQueueSummaryUI(clipsCount, totalDur, killsCount, deathsCount) {
+      document.getElementById('summary-clips-count').textContent = clipsCount;
+      document.getElementById('summary-duration').textContent = `${totalDur} с`;
+      document.getElementById('summary-kills-count').textContent = killsCount;
+      document.getElementById('summary-deaths-count').textContent = deathsCount;
+
+      document.getElementById('btn-start-render').disabled = clipsCount === 0;
+      updateQuickRenderSub();
+
+      const box = document.getElementById('clip-queue-preview');
+      box.innerHTML = '';
+      if (state.clipQueue.length === 0) {
+        box.innerHTML = '<div style="font-size: 11.5px; color: var(--text-muted); padding: 4px 0;">Нет выбранных моментов</div>';
+        return;
+      }
+
+      state.clipQueue.forEach((c, idx) => {
+        const isDeath = c.type === 'death';
+        const isVictimReplay = c.type === 'victim_replay';
+        let badgeClass = 'badge-ct';
+        let badgeText = c.kills_count > 1 ? c.kills_count + 'K' : '1K';
+        const rawNicks = isDeath ? (c.attacker_name || '') : (isVictimReplay ? (c.spec_name || '') : (c.victims || []).join(', '));
+        let labelText = `Р${c.round} · ${escapeHtml(rawNicks)}`;
+
+        if (isDeath) {
+          badgeClass = 'badge-t';
+          badgeText = 'DEATH';
+          labelText = `Р${c.round} · от ${escapeHtml(c.attacker_name)}`;
+        } else if (isVictimReplay) {
+          badgeClass = 'badge-neutral';
+          badgeText = 'ПОВТОР';
+          labelText = `Р${c.round} · POV: ${escapeHtml(c.spec_name)}`;
+        }
+
+        const div = document.createElement('div');
+        div.className = 'queue-item';
+        div.draggable = true;
+        div.dataset.idx = idx;
+
+        div.addEventListener('dragstart', (e) => {
+          state.dragSrcIndex = idx;
+          div.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        div.addEventListener('dragend', () => {
+          state.dragSrcIndex = null;
+          div.classList.remove('dragging');
+        });
+        div.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        });
+        div.addEventListener('drop', (e) => {
+          e.preventDefault();
+          const fromIdx = state.dragSrcIndex;
+          const toIdx = idx;
+          if (fromIdx === null || fromIdx === toIdx) return;
+          const moved = state.clipQueue.splice(fromIdx, 1)[0];
+          state.clipQueue.splice(toIdx, 0, moved);
+          state.clipQueue.forEach((item, i) => { item.index = i + 1; });
+          updateQueueSummaryUI(state.clipQueue.length, totalDur, killsCount, deathsCount);
+        });
+
+        div.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+            <span class="mono" style="color: var(--text-muted); cursor: grab;">⋮⋮ #${idx + 1}</span>
+            <span class="badge ${badgeClass}">${badgeText}</span>
+            <span class="nick-text" style="font-size: 13.5px; font-weight: 600; color: var(--text-primary);" title="${escapeHtml(rawNicks)}">${labelText}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+            <span class="mono" style="color: var(--text-secondary);">${c.duration_sec}с</span>
+            <button type="button" class="queue-remove-btn" title="Убрать клип из очереди" aria-label="Удалить клип">×</button>
+          </div>
+        `;
+        div.querySelector('.queue-remove-btn').onclick = (ev) => {
+          ev.stopPropagation();
+          removeClipFromQueue(c);
+        };
+        box.appendChild(div);
+      });
+    }
+
+    async function startRenderJob() {
+      if (!state.demo || !state.activeSteamId) return;
+      const selection = buildSelectionPayload();
+      const rawRes = document.getElementById('opt-resolution').value;
+      const isStretched43 = rawRes.endsWith('_stretch');
+      const [wStr, hStr] = rawRes.replace('_stretch', '').split('x');
+      const wVal = parseInt(wStr, 10) || 1920;
+      const hVal = parseInt(hStr, 10) || 1080;
+
+      const outNameInput = document.getElementById('opt-output-name');
+      const finalOutName = outNameInput.value.trim() || outNameInput.placeholder || '';
+
+      const render_options = {
+        width: wVal,
+        height: hVal,
+        out_width: isStretched43 ? 1920 : wVal,
+        out_height: isStretched43 ? 1080 : hVal,
+        fps: parseInt(document.getElementById('opt-fps').value, 10) || 144,
+        encoder: document.getElementById('opt-encoder').value || 'h264_nvenc',
+        crf: parseInt(document.getElementById('opt-crf').value, 10) || 18,
+        bitrate: document.getElementById('opt-bitrate').value.trim() || '20M',
+        xray_enabled: document.getElementById('opt-xray').checked,
+        hud_enabled: document.getElementById('opt-hud').checked,
+        crossfade: document.getElementById('opt-crossfade').checked,
+        crossfade_duration: 0.2,
+        music_path: '',
+        output_filename: finalOutName,
+      };
+
+      document.getElementById('done-banner').classList.add('hidden');
+      document.getElementById('btn-start-render').disabled = true;
+      document.getElementById('btn-cancel-render').classList.remove('hidden');
+      const progWrap = document.getElementById('render-progress-wrap');
+      if (progWrap) progWrap.classList.remove('hidden');
+      document.getElementById('progress-bar').style.width = '0%';
+      document.getElementById('progress-pct').textContent = '0%';
+      state.lastLogCount = 0;
+      clearRenderLog();
+
+      try {
+        const res = await fetch('/api/render/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...selection, render_options }),
+        });
+        const data = await res.json();
+        if (!res.ok || data.status !== 'started') {
+          throw new Error(data.detail || 'Не удалось запустить рендер');
+        }
+        startPollingRenderStatus();
+      } catch (err) {
+        appendLog('error', err.message);
+        document.getElementById('btn-start-render').disabled = false;
+        document.getElementById('btn-cancel-render').classList.add('hidden');
+        if (progWrap) progWrap.classList.add('hidden');
+      }
+    }
+
+    async function cancelRenderJob() {
+      try {
+        await fetch('/api/render/cancel', { method: 'POST' });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function startPollingRenderStatus() {
+      if (state.pollTimer) clearInterval(state.pollTimer);
+      state.pollTimer = setInterval(async () => {
+        try {
+          const res = await fetch('/api/render/status');
+          const data = await res.json();
+          if (!res.ok) return;
+
+          const progWrap = document.getElementById('render-progress-wrap');
+          if (progWrap) progWrap.classList.toggle('hidden', !data.running);
+
+          const pct = data.progress || 0;
+          document.getElementById('progress-bar').style.width = `${pct}%`;
+          document.getElementById('progress-pct').textContent = `${pct}%`;
+          document.getElementById('render-stage-badge').textContent = `${data.stage || 'idle'} (${data.clip_index || 0}/${data.total_clips || 0})`;
+
+          const logs = data.logs || [];
+          for (let i = state.lastLogCount; i < logs.length; i++) {
+            const item = logs[i];
+            appendLog(item.level, `[${item.timestamp}] ${item.message}`);
+            document.getElementById('progress-label').textContent = item.message;
+          }
+          state.lastLogCount = logs.length;
+
+          if (!data.running) {
+            clearInterval(state.pollTimer);
+            state.pollTimer = null;
+            document.getElementById('btn-start-render').disabled = false;
+            document.getElementById('btn-cancel-render').classList.add('hidden');
+            if (progWrap) progWrap.classList.add('hidden');
+
+            if (data.stage === 'done' && data.output_file) {
+              document.getElementById('done-banner').classList.remove('hidden');
+              document.getElementById('done-file-path').textContent = data.output_file;
+              incrementRecentDemoRenderedClips(data.total_clips || 1);
+            }
+          }
+        } catch (e) {
+          console.error('Poll error:', e);
+        }
+      }, 600);
+    }
+
+    function appendLog(level, text) {
+      const box = document.getElementById('render-log');
+      const line = document.createElement('div');
+      let color = 'var(--text-secondary)';
+      if (level === 'error') color = '#f87171';
+      else if (level === 'warn') color = '#fbbf24';
+      else if (level === 'success') color = '#4ade80';
+      line.style.color = color;
+      line.style.marginBottom = '2px';
+      line.textContent = text;
+      box.appendChild(line);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function clearRenderLog() {
+      document.getElementById('render-log').innerHTML = '';
+    }
+
+    async function openOutputFolder(ev) {
+      if (ev) ev.preventDefault();
+      try {
+        const res = await fetch('/api/open-folder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+        });
+        const data = await res.json();
+        if (data && data.folder) {
+          appendLog('info', `Папка вывода: ${data.folder}`);
+        }
+      } catch (err) {
+        alert('Не удалось открыть папку: ' + err.message);
+      }
+    }
+
+    function openSettingsModal() {
+      document.getElementById('settings-modal').classList.add('open');
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settings-modal').classList.remove('open');
+    }
+
+    async function saveAppSettings() {
+      const payload = {
+        cs2_path: document.getElementById('cfg-cs2-path').value.trim(),
+        hlae_path: document.getElementById('cfg-hlae-path').value.trim(),
+        ffmpeg_path: document.getElementById('cfg-ffmpeg-path').value.trim(),
+        recording_backend: document.getElementById('cfg-backend').value,
+        output_dir: document.getElementById('cfg-output-dir').value.trim(),
+      };
+      try {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (res.ok && data.config) {
+          state.config = data.config;
+          closeSettingsModal();
+          await fetchStatus();
+        }
+      } catch (e) {
+        alert('Ошибка сохранения: ' + e.message);
+      }
+    }
+
+    async function autoDownloadHlae() {
+      const btn = document.getElementById('btn-dl-hlae');
+      btn.textContent = 'Скачивание...';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/hlae/download', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok || data.status !== 'ok') throw new Error(data.detail || 'Ошибка скачивания HLAE');
+        document.getElementById('cfg-hlae-path').value = data.hlae_path;
+        await fetchStatus();
+      } catch (e) {
+        alert('Не удалось скачать HLAE: ' + e.message);
+      } finally {
+        btn.textContent = 'Скачать HLAE';
+        btn.disabled = false;
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>
